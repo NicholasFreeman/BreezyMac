@@ -28,12 +28,13 @@ their workloads. Goal is simply "fans at whatever level avoids throttling."
 step-by-step feedback (very valuable — trust it). Likes committing progress and
 keeping memory current; comfortable starting fresh sessions when context fills.
 
-**Git / project identity:** the git author is now set correctly to **Nicholas
-Freeman <freeman@whoco.org>** (the earlier `User <user@CYNTHIA.local>` note is
-obsolete) — keep committing as-is, don't change the identity. Public repo:
-**https://github.com/NicholasFreeman/BreezyMac** (clones to `BreezyMac/`).
-Licensed **MIT** (© 2026 Nicholas Freeman, `LICENSE.md`). The `org.WhoCo` bundle
-id / mach-service namespace maps to the dev's `whoco.org` domain and is
-intentional — leave it unless a rebrand is explicitly requested (changing it
-touches the whole helper install architecture). See
-[[breezymac-phase-and-open-questions]].
+**Git / project identity:** commit author is **Nicholas Freeman** with GitHub's
+protected no-reply address `12092720+NicholasFreeman@users.noreply.github.com`.
+The personal email was scrubbed from all history after GitHub push-protection
+flagged it; local `git config user.email` already uses the no-reply address, so
+keep committing as-is — never write the personal email into any file or commit.
+Public repo: **https://github.com/NicholasFreeman/BreezyMac** (clones to
+`BreezyMac/`). Licensed **MIT** (© 2026 Nicholas Freeman, `LICENSE.md`). The
+`org.WhoCo` bundle id / mach-service namespace is intentional — leave it unless a
+rebrand is explicitly requested (changing it touches the whole helper install
+architecture). See [[breezymac-phase-and-open-questions]].
