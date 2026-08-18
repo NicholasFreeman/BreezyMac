@@ -127,12 +127,12 @@ private struct AutomaticTab: View {
                 }
             }
             Section(String(localized: "auto.ac", defaultValue: "On External Power")) {
-                setpoint(String(localized: "auto.target", defaultValue: "Start ramping"), value: $state.automaticConfig.acTargetC, range: 50...95)
-                setpoint(String(localized: "auto.ceiling", defaultValue: "Maximum by"), value: $state.automaticConfig.acCeilingC, range: 60...105)
+                setpoint(String(localized: "auto.target", defaultValue: "Start ramping"), value: targetBinding(\.acTargetC, ceiling: \.acCeilingC), range: 50...95)
+                setpoint(String(localized: "auto.ceiling", defaultValue: "Maximum by"), value: ceilingBinding(\.acCeilingC, target: \.acTargetC), range: 60...105)
             }
             Section(String(localized: "auto.battery", defaultValue: "On Battery")) {
-                setpoint(String(localized: "auto.target", defaultValue: "Start ramping"), value: $state.automaticConfig.batteryTargetC, range: 50...100)
-                setpoint(String(localized: "auto.ceiling", defaultValue: "Maximum by"), value: $state.automaticConfig.batteryCeilingC, range: 60...110)
+                setpoint(String(localized: "auto.target", defaultValue: "Start ramping"), value: targetBinding(\.batteryTargetC, ceiling: \.batteryCeilingC), range: 50...100)
+                setpoint(String(localized: "auto.ceiling", defaultValue: "Maximum by"), value: ceilingBinding(\.batteryCeilingC, target: \.batteryTargetC), range: 60...110)
             }
             Section(String(localized: "auto.spikeSection", defaultValue: "Spike Response")) {
                 VStack(alignment: .leading, spacing: 6) {
@@ -159,6 +159,26 @@ private struct AutomaticTab: View {
             }
             Slider(value: value, in: range, step: 1)
         }
+    }
+
+    private let minGap: Double = 5
+
+    /// Target binding clamped to stay at least `minGap` below its ceiling.
+    private func targetBinding(_ target: WritableKeyPath<AutomaticConfig, Double>,
+                               ceiling: WritableKeyPath<AutomaticConfig, Double>) -> Binding<Double> {
+        Binding(
+            get: { state.automaticConfig[keyPath: target] },
+            set: { state.automaticConfig[keyPath: target] = min($0, state.automaticConfig[keyPath: ceiling] - minGap) }
+        )
+    }
+
+    /// Ceiling binding clamped to stay at least `minGap` above its target.
+    private func ceilingBinding(_ ceiling: WritableKeyPath<AutomaticConfig, Double>,
+                                target: WritableKeyPath<AutomaticConfig, Double>) -> Binding<Double> {
+        Binding(
+            get: { state.automaticConfig[keyPath: ceiling] },
+            set: { state.automaticConfig[keyPath: ceiling] = max($0, state.automaticConfig[keyPath: target] + minGap) }
+        )
     }
 }
 

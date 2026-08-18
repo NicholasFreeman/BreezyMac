@@ -33,10 +33,12 @@ struct AutomaticConfig: Codable, Sendable, Equatable {
         source == .battery ? batteryCeilingC : acCeilingC
     }
 
-    /// Conservative-cool on AC, quieter/hotter on battery.
+    /// Conservative-cool on AC, quieter/hotter on battery. Anticipation defaults
+    /// gentle (0.15) — a calm first-run feel that still holds temperatures; power
+    /// users can raise it for a snappier response.
     static var `default`: AutomaticConfig {
         AutomaticConfig(acTargetC: 80, acCeilingC: 95,
                         batteryTargetC: 90, batteryCeilingC: 100,
-                        spikeResponse: 0.5)
+                        spikeResponse: 0.15)
     }
 }
