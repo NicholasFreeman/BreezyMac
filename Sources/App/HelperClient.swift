@@ -77,11 +77,34 @@ final class HelperClient {
     }
 
     /// Remove the daemon entirely (used by an explicit "Uninstall Helper").
+    ///
+    /// The CALLER must ensure control is already released and the app won't
+    /// immediately re-install (see FanController.requestUninstall, which drops
+    /// to Disabled first) — otherwise the lazy-install loop re-registers the
+    /// daemon within a tick and the unregister appears to do nothing.
     func uninstall() {
         stopApprovalWatch()
         disconnect()
-        try? service.unregister()
-        setStatus(.notInstalled)
+        setStatus(.notInstalled)          // optimistic immediate feedback
+        service.unregister { [weak self] error in
+            Task { @MainActor in
+                guard let self else { return }
+                if let error {
+                    NSLog("BreezyMac: SMAppService.unregister() failed: \(error.localizedDescription)")
+                }
+                // Reflect the real post-unregister status.
+                switch self.service.status {
+                case .notRegistered, .notFound:
+                    self.setStatus(.notInstalled)
+                case .requiresApproval:
+                    self.setStatus(.requiresApproval)
+                case .enabled:
+                    self.setStatus(.failed("Uninstall did not take effect (still enabled)."))
+                @unknown default:
+                    self.setStatus(.unknown)
+                }
+            }
+        }
     }
 
     // MARK: Approval watch

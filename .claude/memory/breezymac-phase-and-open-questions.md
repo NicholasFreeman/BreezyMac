@@ -34,7 +34,12 @@ via `MainActor.assumeIsolated`. This is now safety invariant #5 in CLAUDE.md.
 **Post-scaffolding work done (2026-08-16):** demand-driven polling (app idles
 ~0.5–0.8% with UI open, ~0% when Disabled+closed); live approval pickup so
 enabling the helper in Login Items no longer needs an app relaunch; re-assert
-of fan targets when the XPC connection drops / daemon respawns.
+of fan targets when the XPC connection drops / daemon respawns; Uninstall now
+drops to Disabled first (was auto-reinstalling within a tick, so unregister
+appeared to do nothing and control resumed on its own). Note: after unregister,
+macOS may keep a cosmetic Login-Items row until the app bundle is deleted, but
+it should no longer be active. Stale-registration self-heal on rebuild-after-
+delete is a possible follow-up (doesn't affect normal in-place `make run`).
 
 **Next up:** Adaptive curve model + editor UX (#3) — user is choosing a
 graphing/widget library (looking at what idevtim.chillmac uses) and is

@@ -39,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func wireActions() {
         actions.installHelper   = { [weak self] in self?.controller.helper.install() }
-        actions.uninstallHelper = { [weak self] in self?.controller.helper.uninstall() }
+        actions.uninstallHelper = { [weak self] in self?.controller.requestUninstall() }
         actions.openLoginItems  = { [weak self] in self?.controller.helper.openLoginItemsSettings() }
         actions.dumpKeys        = { [weak self] completion in self?.controller.helper.dumpFanKeys(completion: completion) }
     }

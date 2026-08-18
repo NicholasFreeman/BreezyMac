@@ -88,6 +88,14 @@ final class FanController {
         updatePolling()
     }
 
+    /// Uninstall the helper safely: switch to Disabled first so control is
+    /// released and the lazy re-install loop can't immediately re-register the
+    /// daemon, then unregister.
+    func requestUninstall() {
+        state.mode = .disabled       // releases control + prevents auto re-install
+        helper.uninstall()
+    }
+
     /// Best-effort synchronous-ish release for app termination.
     func shutdown() {
         stopTimer()
