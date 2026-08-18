@@ -28,19 +28,29 @@ final class AppState: ObservableObject {
         didSet { persistCurve() }
     }
 
+    @Published var automaticConfig: AutomaticConfig {
+        didSet { persistAutomatic() }
+    }
+
     // MARK: Live state (updated by controllers)
 
     @Published var telemetry = TelemetrySnapshot()
     @Published var helperStatus: HelperStatus = .unknown
     @Published var helperVersion: String? = nil
+    @Published var powerSource: PowerSource = .ac
+    @Published var thermalState: ProcessInfo.ThermalState = .nominal
+    /// Rolling telemetry history for charts (oldest first, most recent last).
+    @Published var history: [TelemetrySample] = []
 
     /// Set by FanController so mode changes trigger an immediate apply.
     var onModeChange: ((OperatingMode) -> Void)?
 
     private let defaults = UserDefaults.standard
+    private let historyLimit = 300
     private enum Keys {
         static let mode = "operatingMode"
         static let curve = "fanCurveConfig"
+        static let automatic = "automaticConfig"
     }
 
     private init() {
@@ -56,11 +66,35 @@ final class AppState: ObservableObject {
         } else {
             curveConfig = .default
         }
+
+        if let data = defaults.data(forKey: Keys.automatic),
+           let cfg = try? JSONDecoder().decode(AutomaticConfig.self, from: data) {
+            automaticConfig = cfg
+        } else {
+            automaticConfig = .default
+        }
     }
 
     private func persistCurve() {
         if let data = try? JSONEncoder().encode(curveConfig) {
             defaults.set(data, forKey: Keys.curve)
+        }
+    }
+
+    private func persistAutomatic() {
+        if let data = try? JSONEncoder().encode(automaticConfig) {
+            defaults.set(data, forKey: Keys.automatic)
+        }
+    }
+
+    /// Append a sample to the rolling history buffer, trimming to the limit.
+    func appendHistory(from snapshot: TelemetrySnapshot) {
+        history.append(TelemetrySample(time: Date(),
+                                       cpuTemp: snapshot.cpuTemp,
+                                       gpuTemp: snapshot.gpuTemp,
+                                       fanRPMs: snapshot.fans.map { $0.actualRPM }))
+        if history.count > historyLimit {
+            history.removeFirst(history.count - historyLimit)
         }
     }
 }

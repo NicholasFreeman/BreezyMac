@@ -23,9 +23,20 @@ Only the app touches the UI; only the helper touches fan writes.
 - **disabled** — app + helper have zero influence; all control returned to macOS.
   This is the safe default. The helper is not even registered until an engaging
   mode first needs it.
-- **silent** — all fans forced to the lowest attainable speed (curve ignored).
-- **adaptive** — fans follow the fan curve vs CPU/GPU/system thermals.
+- **automatic** — the flagship anti-throttle mode. Fans ramp to hold CPU/GPU
+  temps below the throttle threshold: proportional ramp between per-power-source
+  target/ceiling setpoints + a dT/dt anticipation term + a **max override** when
+  `ProcessInfo.thermalState` is `.serious`/`.critical` (the only public throttle
+  proxy on Apple Silicon) or temp ≥ ceiling. See AutomaticController.swift /
+  AutomaticConfig.swift.
+- **adaptive** — fans follow user-defined curves (per power source).
 - **performance** — all fans forced to maximum (curve ignored).
+
+Modes and curves are **power-source aware** (AC vs battery), via IOKit power
+sources (PowerSourceMonitor.swift). "Silent" was removed: its battery/quiet
+use-case is served by battery-specific setpoints/curves. Automatic and Adaptive
+depend on live temps (`OperatingMode.needsTemperature`), so a tick reads them
+even when no UI is visible.
 
 ## Safety invariants (non-negotiable — these are product requirements)
 
@@ -73,10 +84,12 @@ Polling is demand-driven so the app idles near 0% CPU:
 Sources/
   Shared/            compiled into BOTH targets
     OperatingMode.swift  FanCurve.swift  HelperProtocol.swift
+    PowerSource.swift  AutomaticConfig.swift
     SMC/ SMCTypes.swift  SMCConnection.swift  SMCKeys.swift
   App/               unprivileged UI (AppKit + SwiftUI)
     main.swift  AppDelegate.swift  AppState.swift  HelperClient.swift
-    FanController.swift  StatusBarController.swift  ConfigWindowController.swift
+    FanController.swift  AutomaticController.swift  PowerSourceMonitor.swift
+    StatusBarController.swift  ConfigWindowController.swift
     Theme.swift  Views/ConfigView.swift
     Info.plist  BreezyMac.entitlements  Resources/ (icons, Localizable.xcstrings)
   Helper/            privileged daemon (Foundation/IOKit only — no AppKit)
@@ -161,9 +174,9 @@ ship from them.
 - **Deployment target: macOS 26** is the sole priority. macOS 25 / macOS 15 are
   *stretch goals*, revisited only once the app is fully functional on 26. Keep
   the target at 26.0 for now; don't spend effort on back-compat yet.
-- **Silent mode** is a *nice-to-have*, not critical. True 0-RPM feasibility on
-  M-series will be explored nearer production. For now request 0 and let the SMC
-  clamp to each fan's floor.
+- **Silent mode removed** (second round). Its battery/quiet use-case is now
+  served by power-source-aware setpoints (Automatic) and battery-specific curves
+  (Adaptive). True 0-RPM feasibility on M-series is a later exploration.
 - **Status-bar icon:** the current colored 18pt image is fine. Aesthetics and
   animation come after the app is functional.
 - **Portuguese: pt-BR** (Brazilian) is the supported dialect.

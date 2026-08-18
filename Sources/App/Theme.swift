@@ -26,7 +26,7 @@ enum Theme {
     static func modeColor(_ mode: OperatingMode) -> Color {
         switch mode {
         case .disabled:    return .secondary
-        case .silent:      return .blue
+        case .automatic:   return .teal
         case .adaptive:    return .green
         case .performance: return .orange
         }

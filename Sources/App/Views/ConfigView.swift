@@ -18,6 +18,8 @@ struct ConfigView: View {
         TabView {
             GeneralTab(actions: actions)
                 .tabItem { Label(String(localized: "tab.general", defaultValue: "General"), systemImage: "gearshape") }
+            AutomaticTab()
+                .tabItem { Label(String(localized: "tab.automatic", defaultValue: "Automatic"), systemImage: "gauge.medium") }
             FansTab()
                 .tabItem { Label(String(localized: "tab.fans", defaultValue: "Fans"), systemImage: "fanblades") }
             CurveTab()
@@ -82,8 +84,8 @@ private struct GeneralTab: View {
     private var modeDescription: String {
         switch state.mode {
         case .disabled:    return String(localized: "desc.disabled", defaultValue: "Fan control is fully returned to macOS.")
-        case .silent:      return String(localized: "desc.silent", defaultValue: "Fans held at their lowest speed, regardless of load.")
-        case .adaptive:    return String(localized: "desc.adaptive", defaultValue: "Fans follow the curve based on temperature.")
+        case .automatic:   return String(localized: "desc.automatic", defaultValue: "Fans ramp automatically to keep temperatures below the throttle threshold.")
+        case .adaptive:    return String(localized: "desc.adaptive", defaultValue: "Fans follow your curve based on temperature.")
         case .performance: return String(localized: "desc.performance", defaultValue: "Fans held at maximum, regardless of load.")
         }
     }
@@ -106,6 +108,77 @@ private struct GeneralTab: View {
         case .failed: return .red
         default: return .secondary
         }
+    }
+}
+
+// MARK: - Automatic
+
+private struct AutomaticTab: View {
+    @EnvironmentObject var state: AppState
+
+    var body: some View {
+        Form {
+            Section {
+                Text(String(localized: "auto.note", defaultValue: "Automatic holds temperatures below the throttle threshold: fans stay quiet until the target, ramp toward the ceiling, and jump to maximum under thermal pressure. Setpoints differ per power source."))
+                    .font(.callout).foregroundStyle(.secondary)
+                LabeledContent(String(localized: "auto.currentSource", defaultValue: "Current power"), value: state.powerSource.displayName)
+                LabeledContent(String(localized: "auto.thermal", defaultValue: "Thermal state")) {
+                    Text(thermalStateName(state.thermalState)).foregroundStyle(thermalStateColor(state.thermalState))
+                }
+            }
+            Section(String(localized: "auto.ac", defaultValue: "On External Power")) {
+                setpoint(String(localized: "auto.target", defaultValue: "Start ramping"), value: $state.automaticConfig.acTargetC, range: 50...95)
+                setpoint(String(localized: "auto.ceiling", defaultValue: "Maximum by"), value: $state.automaticConfig.acCeilingC, range: 60...105)
+            }
+            Section(String(localized: "auto.battery", defaultValue: "On Battery")) {
+                setpoint(String(localized: "auto.target", defaultValue: "Start ramping"), value: $state.automaticConfig.batteryTargetC, range: 50...100)
+                setpoint(String(localized: "auto.ceiling", defaultValue: "Maximum by"), value: $state.automaticConfig.batteryCeilingC, range: 60...110)
+            }
+            Section(String(localized: "auto.spikeSection", defaultValue: "Spike Response")) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(String(localized: "auto.spike", defaultValue: "Anticipation"))
+                        Spacer()
+                        Text(String(format: "%.0f%%", state.automaticConfig.spikeResponse * 100)).monospacedDigit().foregroundStyle(Theme.accent)
+                    }
+                    Slider(value: $state.automaticConfig.spikeResponse, in: 0...1)
+                    Text(String(localized: "auto.spike.help", defaultValue: "Higher values ramp the fans earlier when temperature is rising quickly."))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private func setpoint(_ label: String, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(label)
+                Spacer()
+                Text(String(format: "%.0f°C", value.wrappedValue)).monospacedDigit().foregroundStyle(Theme.accent)
+            }
+            Slider(value: value, in: range, step: 1)
+        }
+    }
+}
+
+private func thermalStateName(_ s: ProcessInfo.ThermalState) -> String {
+    switch s {
+    case .nominal:  return String(localized: "thermal.nominal", defaultValue: "Nominal")
+    case .fair:     return String(localized: "thermal.fair", defaultValue: "Fair")
+    case .serious:  return String(localized: "thermal.serious", defaultValue: "Serious")
+    case .critical: return String(localized: "thermal.critical", defaultValue: "Critical")
+    @unknown default: return "—"
+    }
+}
+
+private func thermalStateColor(_ s: ProcessInfo.ThermalState) -> Color {
+    switch s {
+    case .nominal:  return .green
+    case .fair:     return .yellow
+    case .serious:  return .orange
+    case .critical: return .red
+    @unknown default: return .secondary
     }
 }
 
@@ -190,6 +263,12 @@ private struct SensorsTab: View {
                 tempRow(String(localized: "sensor.cpu", defaultValue: "CPU"), state.telemetry.cpuTemp)
                 tempRow(String(localized: "sensor.gpu", defaultValue: "GPU"), state.telemetry.gpuTemp)
                 tempRow(String(localized: "sensor.battery", defaultValue: "Battery"), state.telemetry.batteryTemp)
+            }
+            Section(String(localized: "sensors.system", defaultValue: "System")) {
+                LabeledContent(String(localized: "sensors.power", defaultValue: "Power source"), value: state.powerSource.displayName)
+                LabeledContent(String(localized: "sensors.thermal", defaultValue: "Thermal state")) {
+                    Text(thermalStateName(state.thermalState)).foregroundStyle(thermalStateColor(state.thermalState))
+                }
             }
             Section {
                 Text(String(localized: "sensors.usageNote", defaultValue: "CPU/GPU utilization inputs for the adaptive algorithm will be surfaced here in a later iteration."))

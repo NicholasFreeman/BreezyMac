@@ -25,6 +25,8 @@ final class FanController {
     private let state = AppState.shared
     private let reader = SMCReader()
     let helper = HelperClient()
+    private let automatic = AutomaticController()
+    private let powerMonitor = PowerSourceMonitor()
 
     private var timer: Timer?
     private var asleep = false
@@ -71,11 +73,29 @@ final class FanController {
         // re-apply targets to the freshly-started, control-released helper.
         helper.onConnectionLost = { [weak self] in self?.lastAppliedTargets = [] }
 
-        state.onModeChange = { [weak self] _ in self?.applyCurrentMode() }
+        state.onModeChange = { [weak self] mode in
+            guard let self else { return }
+            if mode == .automatic { self.automatic.reset() }   // fresh smoothing state
+            self.applyCurrentMode()
+        }
 
         let nc = NSWorkspace.shared.notificationCenter
         nc.addObserver(self, selector: #selector(willSleep), name: NSWorkspace.willSleepNotification, object: nil)
         nc.addObserver(self, selector: #selector(didWake), name: NSWorkspace.didWakeNotification, object: nil)
+        // Thermal pressure is our throttle proxy — react immediately, not on the
+        // next 2 s tick, when macOS reports it changed.
+        NotificationCenter.default.addObserver(self, selector: #selector(thermalChanged),
+                                               name: ProcessInfo.thermalStateDidChangeNotification, object: nil)
+
+        // Track power source and re-apply when it changes (setpoints/curves differ).
+        state.thermalState = ProcessInfo.processInfo.thermalState
+        state.powerSource = powerMonitor.current()
+        powerMonitor.onChange = { [weak self] source in
+            guard let self else { return }
+            self.state.powerSource = source
+            self.applyCurrentMode()
+        }
+        powerMonitor.start()
 
         // Do NOT auto-install the privileged daemon. In the default Disabled
         // mode the app must have zero system influence. We register lazily the
@@ -99,6 +119,7 @@ final class FanController {
     /// Best-effort synchronous-ish release for app termination.
     func shutdown() {
         stopTimer()
+        powerMonitor.stop()
         reader.stop()
         helper.releaseControl()
         // Give the XPC message a brief window to flush before we exit.
@@ -150,15 +171,21 @@ final class FanController {
 
     private func tick() {
         guard !asleep else { return }
+        state.thermalState = ProcessInfo.processInfo.thermalState
+
+        var refreshed = false
         if uiVisible {
             state.telemetry = reader.snapshot()              // full read for the UI
-        } else if state.mode == .adaptive {
-            let t = reader.temperatures()                    // curve only needs temps
+            refreshed = true
+        } else if state.mode.needsTemperature {
+            let t = reader.temperatures()                    // Automatic/Adaptive need temps
             state.telemetry.cpuTemp = t.cpu
             state.telemetry.gpuTemp = t.gpu
             state.telemetry.batteryTemp = t.battery
+            refreshed = true
         }
-        // Performance/Silent while hidden: no SMC reads — just heartbeat below.
+        // Performance while hidden: no SMC reads — just heartbeat below.
+        if refreshed { state.appendHistory(from: state.telemetry) }
         drive()
     }
 
@@ -170,7 +197,7 @@ final class FanController {
                 engaged = false
                 lastAppliedTargets = []
             }
-        case .silent, .performance, .adaptive:
+        case .automatic, .adaptive, .performance:
             // Lazily register the privileged helper the first time control is
             // actually needed. install() is a no-op once ready.
             if !isHelperReady, !installRequested {
@@ -206,18 +233,25 @@ final class FanController {
         switch mode {
         case .disabled:
             return bounds.map { _ in kFanTargetAuto }
-        case .silent:
-            // Attempt lowest possible; the helper clamps to each fan's floor.
-            // TODO: confirm whether true 0-RPM is attainable on M-series.
-            return bounds.map { _ in 0 }
         case .performance:
             return bounds.map { $0.maxRPM }
+        case .automatic:
+            let frac = automatic.fraction(cpu: state.telemetry.cpuTemp,
+                                          gpu: state.telemetry.gpuTemp,
+                                          thermalState: state.thermalState,
+                                          source: state.powerSource,
+                                          config: state.automaticConfig,
+                                          now: Date())
+            return bounds.map { fraction(frac, of: $0) }
         case .adaptive:
             let frac = state.curveConfig.targetFraction(for: state.telemetry)
-            return bounds.map { b in
-                Int((Double(b.minRPM) + frac * Double(max(0, b.maxRPM - b.minRPM))).rounded())
-            }
+            return bounds.map { fraction(frac, of: $0) }
         }
+    }
+
+    /// Map a 0...1 fan fraction to an RPM within a fan's [min, max].
+    private func fraction(_ frac: Double, of bounds: SMCReader.FanBounds) -> Int {
+        Int((Double(bounds.minRPM) + frac * Double(max(0, bounds.maxRPM - bounds.minRPM))).rounded())
     }
 
     /// True if the new targets differ enough from the last applied set to be
@@ -242,5 +276,12 @@ final class FanController {
     @objc private func didWake() {
         asleep = false
         applyCurrentMode()
+    }
+
+    @objc private func thermalChanged() {
+        state.thermalState = ProcessInfo.processInfo.thermalState
+        // In Automatic, thermal pressure jumps the fans to max — apply now
+        // rather than waiting for the next tick.
+        if state.mode == .automatic { applyCurrentMode() }
     }
 }

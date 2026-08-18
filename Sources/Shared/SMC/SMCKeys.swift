@@ -53,6 +53,15 @@ struct TelemetrySnapshot: Codable, Equatable {
     var batteryTemp: Double? = nil
 }
 
+/// A timestamped sample retained in the rolling history buffer for charts.
+struct TelemetrySample: Equatable, Sendable, Identifiable {
+    let id = UUID()
+    let time: Date
+    let cpuTemp: Double?
+    let gpuTemp: Double?
+    let fanRPMs: [Int]
+}
+
 /// High-level SMC reader. Wraps an `SMCConnection` and exposes fan/temperature
 /// telemetry. Reads only — safe to use from the unprivileged app.
 final class SMCReader {

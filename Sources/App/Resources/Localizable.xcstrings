@@ -62,16 +62,16 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "性能" } }
       }
     },
-    "mode.silent" : {
+    "mode.automatic" : {
       "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Lautlos" } },
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Silent" } },
-        "en-GB" : { "stringUnit" : { "state" : "translated", "value" : "Silent" } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "Silencioso" } },
-        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Silencieux" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "무음" } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Silencioso" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "静音" } }
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Automatisch" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Automatic" } },
+        "en-GB" : { "stringUnit" : { "state" : "translated", "value" : "Automatic" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Automático" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Automatique" } },
+        "ko" : { "stringUnit" : { "state" : "translated", "value" : "자동" } },
+        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Automático" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自动" } }
       }
     },
     "sensor.battery" : {
