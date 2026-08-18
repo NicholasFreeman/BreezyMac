@@ -19,7 +19,8 @@ authoritative architecture/safety doc; [[breezymac-user-preferences]] and
 - **Automatic** (flagship anti-throttle) — proportional ramp between per-source
   target/ceiling temps + dT/dt anticipation term + max override when
   `ProcessInfo.thermalState` ≥ `.serious` OR temp ≥ ceiling; rise-fast/decay-slow.
-- **Adaptive** — user curves (AC + Battery split still TODO, see step 5).
+- **Adaptive** — user curves, now **power-source aware** (separate AC/battery
+  sets) with a selectable interpolation mode (linear vs monotone-cubic "smooth").
 - **Performance** — all fans max.
 
 ## On-device validation / tuning outcome
@@ -41,10 +42,19 @@ tab). **Step 4 (popover + Swift Charts) IMPLEMENTED & building clean** (commit
 ba0546e "Step 4a"): NSMenu→NSPopover hosting a mode switcher + toggleable text
 indicators + two stacked synced charts; new `PopoverSettings` model + "Popover"
 config tab; Fans/Sensors tabs removed; Automatic "Reset to Defaults" button
-added; `TelemetrySample` gained `batteryTemp`. **On-device popover verification
-still pending** (charts render, interaction, key focus on the accessory app).
-Then 5 (Adaptive AC/Battery curves + monotone-cubic-vs-linear), 6 (config
-restructure).
+added; `TelemetrySample` gained `batteryTemp`. **Popover VERIFIED on-device**
+(commits 4b/4c fixed: off-screen/gap positioning via `.fixedSize` + hosting
+`sizingOptions`; hide chart when its series toggled off; pinned x-axis labels).
+
+**Step 5 (Adaptive power-source curves + linear/monotone-cubic) IMPLEMENTED &
+building clean** (commit f981a46): `FanCurveConfig` → `interpolation` +
+`ac`/`battery` curve sets; `targetFraction(for:source:)`; new
+`CurveInterpolation {linear, smooth}` where smooth = monotone-cubic
+(Fritsch–Carlson), default smooth; Curve tab rewritten with a Smoothing picker,
+an AC/Battery selector, and a live preview chart (active solid + alternative
+dashed, sampled from the model) + Reset. **On-device Adaptive verification
+pending** (curve behavior, which smoothing to keep). Next = step 6 (config
+restructure); still open: CPU/GPU-utilization inputs to the algorithms.
 
 ### Step 4 implementation choices (may revisit after on-device test)
 - Refresh interval = **display subsampling of the fixed 2 s control tick**
