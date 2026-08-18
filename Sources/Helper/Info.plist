@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Info.plist for the helper tool. Embedded into the Mach-O __TEXT section via
+  CREATE_INFOPLIST_SECTION_IN_BINARY=YES (a command-line tool has no bundle).
+  SMAuthorizedClients declares which app is permitted to install/own this
+  helper — the reverse-direction trust of the app's SMPrivilegedExecutables.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>org.WhoCo.BreezyMac.Helper</string>
+    <key>CFBundleName</key>
+    <string>BreezyMac Helper</string>
+    <key>CFBundleVersion</key>
+    <string>0.1.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>SMAuthorizedClients</key>
+    <array>
+        <!-- TODO: append the Developer ID certificate clause for release builds. -->
+        <string>identifier "org.WhoCo.BreezyMac" and anchor apple generic</string>
+    </array>
+</dict>
+</plist>

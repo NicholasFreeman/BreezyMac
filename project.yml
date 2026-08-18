@@ -1,0 +1,95 @@
+name: BreezyMac
+
+options:
+  bundleIdPrefix: org.WhoCo
+  deploymentTarget:
+    macOS: "26.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"                 # Swift 5 language mode — relaxed concurrency for now
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "0.1.0"
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"              # ad-hoc for local debug
+    DEVELOPMENT_TEAM: ""
+    ENABLE_HARDENED_RUNTIME: NO          # keep off for ad-hoc debug friction
+    DEAD_CODE_STRIPPING: YES
+    ALWAYS_SEARCH_USER_PATHS: NO
+  configs:
+    Debug:
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+      SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+      GCC_PREPROCESSOR_DEFINITIONS: "DEBUG=1 $(inherited)"
+      ONLY_ACTIVE_ARCH: YES
+    Release:
+      SWIFT_OPTIMIZATION_LEVEL: "-O"
+
+targets:
+  # ─────────────────────────── App (unprivileged UI) ───────────────────────
+  BreezyMac:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/App
+        excludes:
+          - "Info.plist"
+          - "*.entitlements"
+      - path: Sources/Shared
+    settings:
+      base:
+        PRODUCT_NAME: BreezyMac
+        PRODUCT_BUNDLE_IDENTIFIER: org.WhoCo.BreezyMac
+        INFOPLIST_FILE: Sources/App/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Sources/App/BreezyMac.entitlements
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
+    dependencies:
+      - target: BreezyMacHelper
+        embed: false
+        codeSign: false
+    postCompileScripts:
+      - name: Embed Privileged Helper
+        basedOnDependencyAnalysis: false
+        script: |
+          set -euo pipefail
+          LS_DIR="${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchServices"
+          LD_DIR="${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchDaemons"
+          mkdir -p "$LS_DIR" "$LD_DIR"
+          # The daemon executable ships INSIDE the app bundle (SMAppService model).
+          cp "${BUILT_PRODUCTS_DIR}/org.WhoCo.BreezyMac.Helper" "$LS_DIR/org.WhoCo.BreezyMac.Helper"
+          # The SMAppService install plist MUST live at this exact path or
+          # register() fails with SMAppServiceErrorDomain 108.
+          cp "${SRCROOT}/Sources/Helper/LaunchDaemon.plist" "$LD_DIR/org.WhoCo.BreezyMac.Helper.plist"
+
+  # ────────────────────── Helper (privileged LaunchDaemon) ──────────────────
+  BreezyMacHelper:
+    type: tool
+    platform: macOS
+    sources:
+      - path: Sources/Helper
+        excludes:
+          - "*.plist"
+          - "*.entitlements"
+      - path: Sources/Shared
+    settings:
+      base:
+        PRODUCT_NAME: org.WhoCo.BreezyMac.Helper
+        PRODUCT_BUNDLE_IDENTIFIER: org.WhoCo.BreezyMac.Helper
+        INFOPLIST_FILE: Sources/Helper/Info.plist
+        CREATE_INFOPLIST_SECTION_IN_BINARY: YES
+        CODE_SIGN_ENTITLEMENTS: Sources/Helper/Helper.entitlements
+        SKIP_INSTALL: YES
+        # Embed the launchd plist into the Mach-O so launchd can read it.
+        OTHER_LDFLAGS: "-sectcreate __TEXT __launchd_plist ${SRCROOT}/Sources/Helper/Launchd.plist"
+
+schemes:
+  BreezyMac:
+    build:
+      targets:
+        BreezyMac: all
+        BreezyMacHelper: all
+    run:
+      config: Debug

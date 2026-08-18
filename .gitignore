@@ -1,0 +1,24 @@
+# Reference projects — read-only source material, not part of this repo
+# (idevtim.chillmac is itself a nested git checkout).
+Reference/
+
+# Generated Xcode project — recreate with `make gen` (source of truth: project.yml)
+BreezyMac.xcodeproj/
+
+# Build output
+build/
+DerivedData/
+*.app
+*.dmg
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+
+# macOS
+.DS_Store
+
+# Swift Package Manager (if introduced later)
+.build/
+.swiftpm/

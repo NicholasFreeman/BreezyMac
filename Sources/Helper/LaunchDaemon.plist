@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  LaunchDaemon.plist — SMAppService install definition.
+
+  Build copies this to, and it is ONLY read from:
+      BreezyMac.app/Contents/Library/LaunchDaemons/org.WhoCo.BreezyMac.Helper.plist
+
+  `SMAppService.daemon(plistName: "org.WhoCo.BreezyMac.Helper.plist")` registers
+  it. If this file is missing from that exact bundle path, register() fails with
+  SMAppServiceErrorDomain 108 ("Unable to read plist") and no fan ever moves —
+  a failure mode we take pains to avoid (see project.yml postCompileScripts).
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>org.WhoCo.BreezyMac.Helper</string>
+    <key>BundleProgram</key>
+    <string>Contents/Library/LaunchServices/org.WhoCo.BreezyMac.Helper</string>
+    <key>MachServices</key>
+    <dict>
+        <key>org.WhoCo.BreezyMac.Helper</key>
+        <true/>
+    </dict>
+    <key>AssociatedBundleIdentifiers</key>
+    <array>
+        <string>org.WhoCo.BreezyMac</string>
+    </array>
+</dict>
+</plist>

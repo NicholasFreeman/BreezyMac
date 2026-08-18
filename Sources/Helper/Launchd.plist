@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Launchd.plist — the minimal launchd description embedded INTO the helper
+  binary's __TEXT,__launchd_plist section (via OTHER_LDFLAGS -sectcreate).
+  This is what launchd itself reads to know the service's Label and the mach
+  service it vends. Distinct from LaunchDaemon.plist (the SMAppService install
+  definition) — both are required.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>org.WhoCo.BreezyMac.Helper</string>
+    <key>MachServices</key>
+    <dict>
+        <key>org.WhoCo.BreezyMac.Helper</key>
+        <true/>
+    </dict>
+</dict>
+</plist>

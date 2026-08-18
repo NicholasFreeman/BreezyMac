@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleDisplayName</key>
+    <string>BreezyMac</string>
+    <key>CFBundleName</key>
+    <string>BreezyMac</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>$(MARKETING_VERSION)</string>
+    <key>CFBundleVersion</key>
+    <string>$(CURRENT_PROJECT_VERSION)</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>NSMainNibFile</key>
+    <string></string>
+    <!-- Agent app: status-bar only, no Dock icon. -->
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHumanReadableCopyright</key>
+    <string>© WhoCo</string>
+    <!-- Localizations shipped by the app. -->
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>en</string>
+        <string>en-GB</string>
+        <string>es</string>
+        <string>zh-Hans</string>
+        <string>ko</string>
+        <string>de</string>
+        <string>fr</string>
+        <string>pt-BR</string>
+    </array>
+    <!-- NOTE: We rely on SMAppService (macOS 13+), not the legacy SMJobBless
+         path, so SMPrivilegedExecutables is intentionally omitted for now. -->
+</dict>
+</plist>
