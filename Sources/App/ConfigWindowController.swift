@@ -66,7 +66,7 @@ final class ConfigWindowController: NSObject, NSWindowDelegate {
         let win = NSWindow(contentViewController: hosting)
         win.title = "BreezyMac"
         win.styleMask = [.titled, .closable, .miniaturizable]
-        win.setContentSize(NSSize(width: 560, height: 460))
+        win.setContentSize(NSSize(width: 700, height: 480))
         win.isReleasedWhenClosed = false
         win.center()
         win.delegate = self

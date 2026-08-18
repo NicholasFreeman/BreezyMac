@@ -2,12 +2,14 @@
 //  ConfigView.swift
 //  BreezyMac — App
 //
-//  The tabbed configuration window. Sections: General (mode + helper), Automatic
-//  (anti-throttle setpoints), Curve (Adaptive-mode editor), Popover (live-chart
-//  toggles + refresh), and About. Live telemetry now lives in the status-bar
-//  popover, so the former Fans and Sensors tabs were removed. This is
-//  intentionally a functional-but-minimal scaffold; the elegant visual pass
-//  (translucent cards, animations) comes later, informed by the ChillMac look.
+//  The configuration window: a macOS Settings-style sidebar (NavigationSplitView)
+//  with one destination per concern — General (mode + at-a-glance status),
+//  Automatic (anti-throttle setpoints), Adaptive (curve editor), Popover
+//  (live-chart toggles), Helper (privileged-helper install + startup), and About.
+//  Live telemetry now lives in the status-bar popover, so the former Fans and
+//  Sensors tabs are gone. The mode-specific pages (Automatic, Adaptive) are
+//  editable at any time, independent of the active mode. This is a functional
+//  scaffold; the elegant visual pass (translucent cards, animations) comes later.
 //
 
 import SwiftUI
@@ -16,22 +18,57 @@ import Charts
 struct ConfigView: View {
     @EnvironmentObject var state: AppState
     let actions: ConfigActions
+    @State private var selection: Section? = .general
 
     var body: some View {
-        TabView {
-            GeneralTab(actions: actions)
-                .tabItem { Label(String(localized: "tab.general", defaultValue: "General"), systemImage: "gearshape") }
-            AutomaticTab()
-                .tabItem { Label(String(localized: "tab.automatic", defaultValue: "Automatic"), systemImage: "gauge.medium") }
-            CurveTab()
-                .tabItem { Label(String(localized: "tab.curve", defaultValue: "Curve"), systemImage: "chart.xyaxis.line") }
-            PopoverTab()
-                .tabItem { Label(String(localized: "tab.popover", defaultValue: "Popover"), systemImage: "chart.bar.xaxis") }
-            AboutTab()
-                .tabItem { Label(String(localized: "tab.about", defaultValue: "About"), systemImage: "info.circle") }
+        NavigationSplitView {
+            List(Section.allCases, selection: $selection) { section in
+                Label(section.title, systemImage: section.symbol).tag(section)
+            }
+            .navigationSplitViewColumnWidth(min: 170, ideal: 188, max: 220)
+        } detail: {
+            detail
+                .navigationTitle((selection ?? .general).title)
         }
-        .frame(minWidth: 520, minHeight: 420)
-        .padding()
+        .frame(minWidth: 660, minHeight: 470)
+    }
+
+    @ViewBuilder private var detail: some View {
+        switch selection ?? .general {
+        case .general:   GeneralTab()
+        case .automatic: AutomaticTab()
+        case .adaptive:  CurveTab()
+        case .popover:   PopoverTab()
+        case .helper:    HelperTab(actions: actions)
+        case .about:     AboutTab()
+        }
+    }
+
+    enum Section: String, CaseIterable, Identifiable, Hashable {
+        case general, automatic, adaptive, popover, helper, about
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .general:   return String(localized: "tab.general", defaultValue: "General")
+            case .automatic: return String(localized: "tab.automatic", defaultValue: "Automatic")
+            case .adaptive:  return String(localized: "tab.adaptive", defaultValue: "Adaptive")
+            case .popover:   return String(localized: "tab.popover", defaultValue: "Popover")
+            case .helper:    return String(localized: "tab.helper", defaultValue: "Helper")
+            case .about:     return String(localized: "tab.about", defaultValue: "About")
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .general:   return "gearshape"
+            case .automatic: return "gauge.medium"
+            case .adaptive:  return "chart.xyaxis.line"
+            case .popover:   return "chart.bar.xaxis"
+            case .helper:    return "shield.lefthalf.filled"
+            case .about:     return "info.circle"
+            }
+        }
     }
 }
 
@@ -39,8 +76,6 @@ struct ConfigView: View {
 
 private struct GeneralTab: View {
     @EnvironmentObject var state: AppState
-    let actions: ConfigActions
-    @State private var launchAtLogin = false
 
     var body: some View {
         Form {
@@ -58,9 +93,41 @@ private struct GeneralTab: View {
                     .font(.callout)
             }
 
+            Section(String(localized: "general.status", defaultValue: "Status")) {
+                LabeledContent(String(localized: "general.power", defaultValue: "Power source"), value: state.powerSource.displayName)
+                LabeledContent(String(localized: "general.thermal", defaultValue: "Thermal state")) {
+                    Text(thermalStateName(state.thermalState)).foregroundStyle(thermalStateColor(state.thermalState))
+                }
+                LabeledContent(String(localized: "general.helperStatus", defaultValue: "Helper")) {
+                    Text(helperStatusText(state.helperStatus)).foregroundStyle(helperStatusColor(state.helperStatus))
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private var modeDescription: String {
+        switch state.mode {
+        case .disabled:    return String(localized: "desc.disabled", defaultValue: "Fan control is fully returned to macOS.")
+        case .automatic:   return String(localized: "desc.automatic", defaultValue: "Fans ramp automatically to keep temperatures below the throttle threshold.")
+        case .adaptive:    return String(localized: "desc.adaptive", defaultValue: "Fans follow your curve based on temperature.")
+        case .performance: return String(localized: "desc.performance", defaultValue: "Fans held at maximum, regardless of load.")
+        }
+    }
+}
+
+// MARK: - Helper
+
+private struct HelperTab: View {
+    @EnvironmentObject var state: AppState
+    let actions: ConfigActions
+    @State private var launchAtLogin = false
+
+    var body: some View {
+        Form {
             Section(String(localized: "general.helper", defaultValue: "Fan Control Helper")) {
                 LabeledContent(String(localized: "general.status", defaultValue: "Status")) {
-                    Text(helperStatusText).foregroundStyle(helperStatusColor)
+                    Text(helperStatusText(state.helperStatus)).foregroundStyle(helperStatusColor(state.helperStatus))
                 }
                 HStack {
                     Button(String(localized: "general.install", defaultValue: "Install / Repair")) { actions.installHelper() }
@@ -77,38 +144,34 @@ private struct GeneralTab: View {
                 Toggle(String(localized: "general.launchAtLogin", defaultValue: "Launch BreezyMac at login"), isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, newValue in actions.setLaunchAtLogin(newValue) }
             }
+
+            Section {
+                Text(String(localized: "helper.explain", defaultValue: "BreezyMac installs a small privileged helper to change fan speeds. It stays dormant until an engaging mode needs it, and hands control back to macOS whenever BreezyMac stops."))
+                    .font(.callout).foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .onAppear { launchAtLogin = actions.isLaunchAtLoginEnabled() }
     }
+}
 
-    private var modeDescription: String {
-        switch state.mode {
-        case .disabled:    return String(localized: "desc.disabled", defaultValue: "Fan control is fully returned to macOS.")
-        case .automatic:   return String(localized: "desc.automatic", defaultValue: "Fans ramp automatically to keep temperatures below the throttle threshold.")
-        case .adaptive:    return String(localized: "desc.adaptive", defaultValue: "Fans follow your curve based on temperature.")
-        case .performance: return String(localized: "desc.performance", defaultValue: "Fans held at maximum, regardless of load.")
-        }
+private func helperStatusText(_ status: HelperStatus) -> String {
+    switch status {
+    case .unknown:          return String(localized: "helper.unknown", defaultValue: "Unknown")
+    case .notInstalled:     return String(localized: "helper.notInstalled", defaultValue: "Not installed")
+    case .installing:       return String(localized: "helper.installing", defaultValue: "Installing…")
+    case .requiresApproval: return String(localized: "helper.requiresApproval", defaultValue: "Needs approval in System Settings")
+    case .ready:            return String(localized: "helper.ready", defaultValue: "Ready")
+    case .failed(let m):    return String(localized: "helper.failed", defaultValue: "Failed") + ": \(m)"
     }
+}
 
-    private var helperStatusText: String {
-        switch state.helperStatus {
-        case .unknown:          return String(localized: "helper.unknown", defaultValue: "Unknown")
-        case .notInstalled:     return String(localized: "helper.notInstalled", defaultValue: "Not installed")
-        case .installing:       return String(localized: "helper.installing", defaultValue: "Installing…")
-        case .requiresApproval: return String(localized: "helper.requiresApproval", defaultValue: "Needs approval in System Settings")
-        case .ready:            return String(localized: "helper.ready", defaultValue: "Ready")
-        case .failed(let m):    return String(localized: "helper.failed", defaultValue: "Failed") + ": \(m)"
-        }
-    }
-
-    private var helperStatusColor: Color {
-        switch state.helperStatus {
-        case .ready: return .green
-        case .requiresApproval, .installing: return .orange
-        case .failed: return .red
-        default: return .secondary
-        }
+private func helperStatusColor(_ status: HelperStatus) -> Color {
+    switch status {
+    case .ready: return .green
+    case .requiresApproval, .installing: return .orange
+    case .failed: return .red
+    default: return .secondary
     }
 }
 
