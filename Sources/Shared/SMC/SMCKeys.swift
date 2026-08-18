@@ -74,12 +74,14 @@ final class SMCReader {
     struct FanBounds { let index: Int; let name: String; let minRPM: Int; let maxRPM: Int }
     private var boundsCache: [FanBounds]?
 
-    /// Resolved temperature keys, cached after first discovery so we stop
-    /// re-probing the long fallback lists every tick. `.none` = not yet probed;
-    /// a stored value of `""` records "probed, none present on this hardware".
-    private var cpuKeyCache: String?
-    private var gpuKeyCache: String?
-    private var batteryKeyCache: String?
+    /// Resolved temperature-sensor keys per group, discovered once (by enumerating
+    /// the SMC and picking the die sensors) then reused every tick. We read the
+    /// MAX across each group so the fans track the hottest core / GPU sensor — the
+    /// throttle-relevant "hot spot" — not whichever single sensor probed first.
+    /// `.none` = not yet resolved.
+    private var cpuKeys: [String]?
+    private var gpuKeys: [String]?
+    private var batteryKeys: [String]?
 
     func start() {
         try? smc.open()
@@ -88,7 +90,7 @@ final class SMCReader {
     func stop() {
         smc.close()
         boundsCache = nil
-        cpuKeyCache = nil; gpuKeyCache = nil; batteryKeyCache = nil
+        cpuKeys = nil; gpuKeys = nil; batteryKeys = nil
     }
 
     var isReady: Bool { smc.isOpen }
@@ -115,9 +117,8 @@ final class SMCReader {
     /// Temperatures only — the minimal read Adaptive mode needs while no UI is
     /// visible. Uses cached sensor keys.
     func temperatures() -> (cpu: Double?, gpu: Double?, battery: Double?) {
-        (cachedTemp(&cpuKeyCache, SMCKey.cpuTemp),
-         cachedTemp(&gpuKeyCache, SMCKey.gpuTemp),
-         cachedTemp(&batteryKeyCache, SMCKey.batteryTemp))
+        resolveSensorKeysIfNeeded()
+        return (hottest(cpuKeys), hottest(gpuKeys), hottest(batteryKeys))
     }
 
     /// Full snapshot for the UI: static bounds (cached) + live actual/target RPM
@@ -144,22 +145,44 @@ final class SMCReader {
         return Int(v.rounded())
     }
 
-    /// Read a temperature using a cached key when known; otherwise probe the
-    /// fallback list once and remember the result (including "none present").
-    private func cachedTemp(_ cache: inout String?, _ keys: [String]) -> Double? {
-        if let key = cache {
-            if key.isEmpty { return nil }                       // known-absent
-            if let v = smc.readDouble(key), v > 0, v < 150 { return v }
-            // Cached key stopped reporting — fall through to re-probe.
+    /// Discover the temperature sensors once. On Apple Silicon the CPU/GPU die is
+    /// covered by many per-core / per-cluster sensors (`Tp`/`Te` for CPU cores,
+    /// `Tg` for the GPU); we enumerate the SMC and keep the ones that read a
+    /// plausible temperature. Falls back to the curated lists on Intel (or if
+    /// enumeration finds nothing). Reading the hottest of each group is what makes
+    /// the fans respond to the actual hot spot rather than one arbitrary sensor.
+    private func resolveSensorKeysIfNeeded() {
+        guard cpuKeys == nil else { return }
+        let all = smc.allKeys()
+        var cpu = all.filter { $0.hasPrefix("Tp") || $0.hasPrefix("Te") }
+        var gpu = all.filter { $0.hasPrefix("Tg") }
+        if cpu.isEmpty { cpu = SMCKey.cpuTemp }        // Intel / fallback
+        if gpu.isEmpty { gpu = SMCKey.gpuTemp }
+        cpuKeys = presentPlausible(cpu)
+        gpuKeys = presentPlausible(gpu)
+        batteryKeys = presentPlausible(SMCKey.batteryTemp)
+        NSLog("BreezyMac: temp sensors resolved — CPU=\(cpuKeys ?? []) GPU=\(gpuKeys ?? []) battery=\(batteryKeys ?? [])")
+    }
+
+    /// Keep only keys that currently read a plausible temperature, so the per-tick
+    /// scan touches just the real sensors (not dozens of absent enumerated keys).
+    private func presentPlausible(_ keys: [String]) -> [String] {
+        keys.filter { key in
+            guard let v = smc.readDouble(key) else { return false }
+            return v > 0 && v < 150
         }
+    }
+
+    /// The hottest plausible reading across a resolved sensor group.
+    private func hottest(_ keys: [String]?) -> Double? {
+        guard let keys, !keys.isEmpty else { return nil }
+        var best: Double?
         for key in keys {
             if let v = smc.readDouble(key), v > 0, v < 150 {
-                cache = key
-                return v
+                best = max(best ?? v, v)
             }
         }
-        cache = ""                                              // probed, none present
-        return nil
+        return best
     }
 
     private func readFanName(_ i: Int) -> String? {

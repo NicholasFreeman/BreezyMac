@@ -269,17 +269,7 @@ private struct CurveTab: View {
             Section {
                 Text(String(localized: "curve.note", defaultValue: "Adaptive mode drives fans from these curves. The highest resulting speed across enabled curves wins."))
                     .font(.callout).foregroundStyle(.secondary)
-                Picker(String(localized: "curve.smoothing", defaultValue: "Smoothing"),
-                       selection: $state.curveConfig.interpolation) {
-                    ForEach(CurveInterpolation.allCases, id: \.self) { mode in
-                        Text(mode.displayName).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-            }
-
-            Section {
-                Picker(String(localized: "curve.editing", defaultValue: "Editing"), selection: $editingSource) {
+                Picker(String(localized: "curve.editing", defaultValue: "Power source"), selection: $editingSource) {
                     Text(PowerSource.ac.displayName).tag(PowerSource.ac)
                     Text(PowerSource.battery.displayName).tag(PowerSource.battery)
                 }
@@ -287,10 +277,7 @@ private struct CurveTab: View {
             }
 
             Section(String(localized: "curve.preview", defaultValue: "Preview")) {
-                CurvePreview(curves: state.curveConfig.curves(for: editingSource),
-                             interpolation: state.curveConfig.interpolation)
-                Text(String(localized: "curve.preview.hint", defaultValue: "Solid = active smoothing; dashed = the other, for comparison."))
-                    .font(.caption).foregroundStyle(.secondary)
+                CurvePreview(curves: state.curveConfig.curves(for: editingSource))
             }
 
             if editingSource == .ac {
@@ -331,19 +318,18 @@ private struct CurveTab: View {
 }
 
 /// A read-only preview of the enabled curves for one power source. Each curve is
-/// sampled from the model itself (so it exactly reflects the control math) in the
-/// active interpolation (solid) plus the alternative one (dashed) for comparison.
+/// sampled from the model itself, so what is drawn exactly reflects the control
+/// math that drives the fans.
 private struct CurvePreview: View {
     let curves: [FanCurve]
-    let interpolation: CurveInterpolation
 
     private let domain: ClosedRange<Double> = 30...105
 
     private struct Sample: Identifiable { let id: Int; let temp: Double; let pct: Double }
 
-    private func samples(_ curve: FanCurve, _ mode: CurveInterpolation) -> [Sample] {
+    private func samples(_ curve: FanCurve) -> [Sample] {
         stride(from: domain.lowerBound, through: domain.upperBound, by: 1).enumerated().map { i, t in
-            Sample(id: i, temp: t, pct: curve.speedPercent(forTemperature: t, interpolation: mode))
+            Sample(id: i, temp: t, pct: curve.speedPercent(forTemperature: t))
         }
     }
 
@@ -356,7 +342,6 @@ private struct CurvePreview: View {
     }
 
     private var enabled: [FanCurve] { curves.filter(\.enabled) }
-    private var alternative: CurveInterpolation { interpolation == .linear ? .smooth : .linear }
 
     var body: some View {
         Group {
@@ -367,17 +352,9 @@ private struct CurvePreview: View {
             } else {
                 Chart {
                     ForEach(enabled) { curve in
-                        // Alternative smoothing — faint dashed, drawn first (behind).
-                        ForEach(samples(curve, alternative)) { s in
+                        ForEach(samples(curve)) { s in
                             LineMark(x: .value("°C", s.temp), y: .value("%", s.pct),
-                                     series: .value("series", "\(curve.id)-alt"))
-                                .foregroundStyle(color(curve.source).opacity(0.35))
-                                .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
-                        }
-                        // Active smoothing — solid.
-                        ForEach(samples(curve, interpolation)) { s in
-                            LineMark(x: .value("°C", s.temp), y: .value("%", s.pct),
-                                     series: .value("series", "\(curve.id)-active"))
+                                     series: .value("series", "\(curve.id)"))
                                 .foregroundStyle(color(curve.source))
                         }
                         // Control points.

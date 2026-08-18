@@ -39,7 +39,7 @@ struct PopoverView: View {
     private let windowSeconds: TimeInterval = 5 * 60
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .center, spacing: 12) {
             header
             modePicker
             if anyIndicatorOn { indicatorRow }

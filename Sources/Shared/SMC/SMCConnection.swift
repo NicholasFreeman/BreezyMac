@@ -112,6 +112,37 @@ final class SMCConnection {
         return SMCDecode.double(type: value.dataType, bytes: value.bytes)
     }
 
+    // MARK: Key enumeration
+
+    /// Number of keys the SMC exposes (`#KEY`), used to walk the key table.
+    func keyCount() -> Int {
+        guard let v = readDouble("#KEY"), v > 0 else { return 0 }
+        return Int(v)
+    }
+
+    /// The 4-char key at a table index (SMC read-by-index sub-command).
+    func key(at index: Int) -> String? {
+        guard connection != 0 else { return nil }
+        var input = SMCKeyData()
+        var output = SMCKeyData()
+        input.data32 = UInt32(index)
+        guard (try? call(.readIndex, &input, &output)) != nil, output.key != 0 else { return nil }
+        return FourCC.toString(output.key)
+    }
+
+    /// Enumerate every key the SMC exposes. Used once to discover the full set of
+    /// temperature sensors present on this specific machine.
+    func allKeys() -> [String] {
+        let count = keyCount()
+        guard count > 0, count < 100_000 else { return [] }
+        var keys: [String] = []
+        keys.reserveCapacity(count)
+        for i in 0..<count {
+            if let k = key(at: i) { keys.append(k) }
+        }
+        return keys
+    }
+
     // MARK: Write (root only)
 
     /// Write raw bytes to a key. `keyType` may be supplied to skip a keyInfo

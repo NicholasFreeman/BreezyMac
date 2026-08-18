@@ -1,90 +1,395 @@
 {
   "sourceLanguage" : "en",
-  "version" : "1.0",
   "strings" : {
+    "—" : {
+
+    },
+    "%@" : {
+
+    },
+    "%@%%" : {
+
+    },
+    "%@°" : {
+
+    },
+    "BreezyMac" : {
+
+    },
     "menu.openConfiguration" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Konfiguration öffnen…" } },
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open Configuration…" } },
-        "en-GB" : { "stringUnit" : { "state" : "translated", "value" : "Open Configuration…" } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "Abrir configuración…" } },
-        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Ouvrir la configuration…" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "설정 열기…" } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Abrir configuração…" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开配置…" } }
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konfiguration öffnen…"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Configuration…"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Configuration…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir configuración…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir la configuration…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설정 열기…"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abrir configuração…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开配置…"
+          }
+        }
       }
     },
     "menu.quit" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "BreezyMac beenden" } },
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Quit BreezyMac" } },
-        "en-GB" : { "stringUnit" : { "state" : "translated", "value" : "Quit BreezyMac" } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "Salir de BreezyMac" } },
-        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Quitter BreezyMac" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "BreezyMac 종료" } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Encerrar BreezyMac" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "退出 BreezyMac" } }
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BreezyMac beenden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quit BreezyMac"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quit BreezyMac"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salir de BreezyMac"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quitter BreezyMac"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "BreezyMac 종료"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encerrar BreezyMac"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出 BreezyMac"
+          }
+        }
       }
     },
     "mode.adaptive" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Adaptiv" } },
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Adaptive" } },
-        "en-GB" : { "stringUnit" : { "state" : "translated", "value" : "Adaptive" } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "Adaptativo" } },
-        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Adaptatif" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "적응형" } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Adaptável" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自适应" } }
-      }
-    },
-    "mode.disabled" : {
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Deaktiviert" } },
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Disabled" } },
-        "en-GB" : { "stringUnit" : { "state" : "translated", "value" : "Disabled" } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "Desactivado" } },
-        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Désactivé" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "사용 안 함" } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Desativado" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已禁用" } }
-      }
-    },
-    "mode.performance" : {
-      "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Leistung" } },
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Performance" } },
-        "en-GB" : { "stringUnit" : { "state" : "translated", "value" : "Performance" } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "Rendimiento" } },
-        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Performance" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "고성능" } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Desempenho" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "性能" } }
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adaptiv"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adaptive"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adaptive"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adaptativo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adaptatif"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "적응형"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adaptável"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自适应"
+          }
+        }
       }
     },
     "mode.automatic" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Automatisch" } },
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Automatic" } },
-        "en-GB" : { "stringUnit" : { "state" : "translated", "value" : "Automatic" } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "Automático" } },
-        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Automatique" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "자동" } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Automático" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自动" } }
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatisch"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatic"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatic"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automático"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatique"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자동"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automático"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动"
+          }
+        }
       }
     },
-    "sensor.battery" : {
+    "mode.disabled" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "de" : { "stringUnit" : { "state" : "translated", "value" : "Batterie" } },
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Battery" } },
-        "en-GB" : { "stringUnit" : { "state" : "translated", "value" : "Battery" } },
-        "es" : { "stringUnit" : { "state" : "translated", "value" : "Batería" } },
-        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Batterie" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "배터리" } },
-        "pt-BR" : { "stringUnit" : { "state" : "translated", "value" : "Bateria" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "电池" } }
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deaktiviert"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disabled"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disabled"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desactivado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Désactivé"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사용 안 함"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desativado"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已禁用"
+          }
+        }
+      }
+    },
+    "mode.performance" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Leistung"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Performance"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Performance"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rendimiento"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Performance"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "고성능"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desempenho"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "性能"
+          }
+        }
+      }
+    },
+    "RPM" : {
+
+    },
+    "sensor.battery" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Batterie"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Battery"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Battery"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Batería"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Batterie"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "배터리"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bateria"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电池"
+          }
+        }
       }
     }
-  }
+  },
+  "version" : "1.0"
 }

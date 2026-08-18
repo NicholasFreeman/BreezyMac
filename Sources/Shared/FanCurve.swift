@@ -3,33 +3,17 @@
 //  BreezyMac — Shared
 //
 //  The Adaptive-mode fan curve model. A curve maps a driving temperature to a
-//  fan-speed percentage by interpolating between sorted control points. Multiple
-//  curves (one per sensor) can be active; the engine takes the MAX resulting
-//  percentage across curves ("highest safety wins"), following the Fanny
-//  rules-engine semantics but in a cleaner model.
+//  fan-speed percentage by interpolating between sorted control points with a
+//  monotone cubic spline (smooth, and guaranteed not to dip or overshoot).
+//  Multiple curves (one per sensor) can be active; the engine takes the MAX
+//  resulting percentage across curves ("highest safety wins"), following the
+//  Fanny rules-engine semantics but in a cleaner model.
 //
-//  Curves are power-source aware (a separate set for AC and battery, mirroring
-//  Automatic's setpoints) and interpolate either linearly or with a monotone
-//  cubic spline — the two are prototyped side by side so one can be chosen.
+//  Curves are power-source aware — a separate set for AC and battery, mirroring
+//  Automatic's setpoints.
 //
 
 import Foundation
-
-/// How a curve interpolates between its control points.
-enum CurveInterpolation: String, CaseIterable, Codable, Sendable {
-    /// Straight segments between points.
-    case linear
-    /// Monotone cubic (Fritsch–Carlson) — smooth, and guaranteed not to dip or
-    /// overshoot between points, so a rising curve stays rising.
-    case smooth
-
-    var displayName: String {
-        switch self {
-        case .linear: return String(localized: "curve.linear", defaultValue: "Linear")
-        case .smooth: return String(localized: "curve.smooth", defaultValue: "Smooth")
-        }
-    }
-}
 
 /// Which temperature sensor drives a curve.
 enum ThermalSource: String, CaseIterable, Codable, Sendable {
@@ -71,25 +55,17 @@ struct FanCurve: Codable, Equatable, Identifiable, Sendable {
         self.points = points
     }
 
-    /// Interpolate the requested fan-speed percentage for a given temperature.
-    /// Below the first point → first point's percent; above the last point →
-    /// last point's percent; between → per `interpolation`.
-    func speedPercent(forTemperature temp: Double,
-                      interpolation: CurveInterpolation = .linear) -> Double {
+    /// Interpolate the requested fan-speed percentage for a given temperature
+    /// using a monotone cubic spline. Below the first point → first point's
+    /// percent; above the last point → last point's percent.
+    func speedPercent(forTemperature temp: Double) -> Double {
         let sorted = points.sorted { $0.temperature < $1.temperature }
         guard let first = sorted.first, let last = sorted.last else { return 0 }
         if temp <= first.temperature { return first.speedPercent }
         if temp >= last.temperature { return last.speedPercent }
-
-        let raw: Double
-        switch interpolation {
-        case .linear:
-            raw = FanCurve.linearValue(sorted, at: temp)
-        case .smooth:
-            // Cubic needs ≥ 3 points to differ from linear; below that, linear.
-            raw = sorted.count >= 3 ? FanCurve.monotoneCubicValue(sorted, at: temp)
+        // Cubic needs ≥ 3 points to differ from linear; below that, use linear.
+        let raw = sorted.count >= 3 ? FanCurve.monotoneCubicValue(sorted, at: temp)
                                     : FanCurve.linearValue(sorted, at: temp)
-        }
         return min(100, max(0, raw))
     }
 
@@ -162,10 +138,8 @@ struct FanCurve: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
-/// The complete Adaptive-mode configuration: an interpolation mode plus a curve
-/// set per power source.
+/// The complete Adaptive-mode configuration: a curve set per power source.
 struct FanCurveConfig: Codable, Equatable, Sendable {
-    var interpolation: CurveInterpolation
     var ac: [FanCurve]
     var battery: [FanCurve]
 
@@ -174,12 +148,11 @@ struct FanCurveConfig: Codable, Equatable, Sendable {
         source == .battery ? battery : ac
     }
 
-    /// Sensible starting curves: a CPU curve enabled per source (cooler on AC,
-    /// quieter/hotter on battery) with a GPU curve present-but-off to enable
-    /// later. Smoothing defaults on — a gentler ramp with no sudden swings.
+    /// Sensible starting curves: CPU and GPU curves enabled per source (cooler on
+    /// AC, quieter/hotter on battery). GPU is on by default so a GPU-bound load is
+    /// protected out of the box — the max across enabled curves wins.
     static var `default`: FanCurveConfig {
         FanCurveConfig(
-            interpolation: .smooth,
             ac: [
                 FanCurve(source: .cpu, enabled: true, points: [
                     CurvePoint(temperature: 40, speedPercent: 0),
@@ -188,7 +161,7 @@ struct FanCurveConfig: Codable, Equatable, Sendable {
                     CurvePoint(temperature: 85, speedPercent: 90),
                     CurvePoint(temperature: 95, speedPercent: 100),
                 ]),
-                FanCurve(source: .gpu, enabled: false, points: [
+                FanCurve(source: .gpu, enabled: true, points: [
                     CurvePoint(temperature: 45, speedPercent: 0),
                     CurvePoint(temperature: 60, speedPercent: 25),
                     CurvePoint(temperature: 75, speedPercent: 55),
@@ -203,7 +176,7 @@ struct FanCurveConfig: Codable, Equatable, Sendable {
                     CurvePoint(temperature: 92, speedPercent: 85),
                     CurvePoint(temperature: 100, speedPercent: 100),
                 ]),
-                FanCurve(source: .gpu, enabled: false, points: [
+                FanCurve(source: .gpu, enabled: true, points: [
                     CurvePoint(temperature: 55, speedPercent: 0),
                     CurvePoint(temperature: 70, speedPercent: 25),
                     CurvePoint(temperature: 85, speedPercent: 55),
@@ -225,7 +198,7 @@ struct FanCurveConfig: Codable, Equatable, Sendable {
             case .battery: temp = snapshot.batteryTemp
             }
             guard let t = temp else { continue }
-            best = max(best, curve.speedPercent(forTemperature: t, interpolation: interpolation) / 100.0)
+            best = max(best, curve.speedPercent(forTemperature: t) / 100.0)
         }
         return min(1.0, max(0.0, best))
     }
