@@ -22,10 +22,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         wireActions()
 
         let config = ConfigWindowController(actions: actions)
+        config.onVisibilityChange = { [weak self] visible in self?.controller.setWindowVisible(visible) }
         configWindow = config
 
         let bar = StatusBarController()
         bar.onOpenConfiguration = { [weak config] in config?.show() }
+        bar.onMenuVisibilityChange = { [weak self] visible in self?.controller.setMenuVisible(visible) }
         statusBar = bar
 
         controller.start()

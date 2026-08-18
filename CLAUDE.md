@@ -53,6 +53,20 @@ Only the app touches the UI; only the helper touches fan writes.
 When touching control flow, do not weaken these. The reference apps we derived
 from both *lacked* reset-on-quit/sleep handling — that was their worst bug.
 
+## Idle behavior / polling (keep the app quiet)
+
+Polling is demand-driven so the app idles near 0% CPU:
+- The tick timer runs only when `mode.engagesHelper || uiVisible`. In Disabled
+  with no menu/window open, the timer is **stopped** entirely.
+- A **full** `SMCReader.snapshot()` runs only when UI is visible. When engaged
+  but hidden, a tick does just a heartbeat, plus a temperatures-only read for
+  Adaptive. `SMCReader` caches resolved temp-sensor keys (no more re-probing the
+  long fallback lists every tick) and static per-fan bounds.
+- Adaptive re-applies fan targets only past a small deadband
+  (`reapplyDeadbandRPM`) to avoid a stream of SMC writes as temps drift.
+- Visibility is wired from `StatusBarController` (menu open/close) and
+  `ConfigWindowController` (window open/close) into `FanController`.
+
 ## Layout
 
 ```

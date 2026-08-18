@@ -58,12 +58,27 @@ struct TelemetrySnapshot: Codable, Equatable {
 final class SMCReader {
     private let smc = SMCConnection()
 
+    /// Static per-fan bounds (count, min/max RPM, name). These do not change at
+    /// runtime, so we resolve them once and reuse — the per-tick reads then only
+    /// touch the live values (actual/target RPM).
+    struct FanBounds { let index: Int; let name: String; let minRPM: Int; let maxRPM: Int }
+    private var boundsCache: [FanBounds]?
+
+    /// Resolved temperature keys, cached after first discovery so we stop
+    /// re-probing the long fallback lists every tick. `.none` = not yet probed;
+    /// a stored value of `""` records "probed, none present on this hardware".
+    private var cpuKeyCache: String?
+    private var gpuKeyCache: String?
+    private var batteryKeyCache: String?
+
     func start() {
         try? smc.open()
     }
 
     func stop() {
         smc.close()
+        boundsCache = nil
+        cpuKeyCache = nil; gpuKeyCache = nil; batteryKeyCache = nil
     }
 
     var isReady: Bool { smc.isOpen }
@@ -73,25 +88,42 @@ final class SMCReader {
         return Int(v)
     }
 
-    func readFan(_ i: Int) -> FanReading {
-        let name = readFanName(i) ?? "Fan \(i + 1)"
-        return FanReading(
-            index: i,
-            name: name,
-            actualRPM: intOr0(SMCKey.fanActualRPM(i)),
-            minRPM: intOr0(SMCKey.fanMinRPM(i)),
-            maxRPM: intOr0(SMCKey.fanMaxRPM(i)),
-            targetRPM: intOr0(SMCKey.fanTargetRPM(i))
-        )
+    /// Cached static bounds for every fan (safe to call every tick).
+    func fanBounds() -> [FanBounds] {
+        if let cached = boundsCache { return cached }
+        let count = fanCount()
+        let bounds = (0..<count).map { i in
+            FanBounds(index: i,
+                      name: readFanName(i) ?? "Fan \(i + 1)",
+                      minRPM: intOr0(SMCKey.fanMinRPM(i)),
+                      maxRPM: intOr0(SMCKey.fanMaxRPM(i)))
+        }
+        boundsCache = bounds
+        return bounds
     }
 
+    /// Temperatures only — the minimal read Adaptive mode needs while no UI is
+    /// visible. Uses cached sensor keys.
+    func temperatures() -> (cpu: Double?, gpu: Double?, battery: Double?) {
+        (cachedTemp(&cpuKeyCache, SMCKey.cpuTemp),
+         cachedTemp(&gpuKeyCache, SMCKey.gpuTemp),
+         cachedTemp(&batteryKeyCache, SMCKey.batteryTemp))
+    }
+
+    /// Full snapshot for the UI: static bounds (cached) + live actual/target RPM
+    /// + temperatures.
     func snapshot() -> TelemetrySnapshot {
         var snap = TelemetrySnapshot()
-        let count = fanCount()
-        snap.fans = (0..<count).map(readFan)
-        snap.cpuTemp = firstValidTemp(SMCKey.cpuTemp)
-        snap.gpuTemp = firstValidTemp(SMCKey.gpuTemp)
-        snap.batteryTemp = firstValidTemp(SMCKey.batteryTemp)
+        snap.fans = fanBounds().map { b in
+            FanReading(index: b.index, name: b.name,
+                       actualRPM: intOr0(SMCKey.fanActualRPM(b.index)),
+                       minRPM: b.minRPM, maxRPM: b.maxRPM,
+                       targetRPM: intOr0(SMCKey.fanTargetRPM(b.index)))
+        }
+        let temps = temperatures()
+        snap.cpuTemp = temps.cpu
+        snap.gpuTemp = temps.gpu
+        snap.batteryTemp = temps.battery
         return snap
     }
 
@@ -102,12 +134,21 @@ final class SMCReader {
         return Int(v.rounded())
     }
 
-    private func firstValidTemp(_ keys: [String]) -> Double? {
+    /// Read a temperature using a cached key when known; otherwise probe the
+    /// fallback list once and remember the result (including "none present").
+    private func cachedTemp(_ cache: inout String?, _ keys: [String]) -> Double? {
+        if let key = cache {
+            if key.isEmpty { return nil }                       // known-absent
+            if let v = smc.readDouble(key), v > 0, v < 150 { return v }
+            // Cached key stopped reporting — fall through to re-probe.
+        }
         for key in keys {
             if let v = smc.readDouble(key), v > 0, v < 150 {
+                cache = key
                 return v
             }
         }
+        cache = ""                                              // probed, none present
         return nil
     }
 

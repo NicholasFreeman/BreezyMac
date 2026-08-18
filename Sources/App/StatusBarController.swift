@@ -18,6 +18,9 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private var cancellables = Set<AnyCancellable>()
 
     var onOpenConfiguration: (() -> Void)?
+    /// Fired true just before the menu displays and false when it closes, so the
+    /// controller can poll telemetry only while the menu is on screen.
+    var onMenuVisibilityChange: ((Bool) -> Void)?
 
     private var modeItems: [NSMenuItem] = []
     private let readoutItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
@@ -98,7 +101,12 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     // MARK: NSMenuDelegate
 
     func menuNeedsUpdate(_ menu: NSMenu) {
+        onMenuVisibilityChange?(true)   // refresh telemetry before we read it below
         refreshDynamicState()
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        onMenuVisibilityChange?(false)
     }
 
     private func refreshDynamicState() {

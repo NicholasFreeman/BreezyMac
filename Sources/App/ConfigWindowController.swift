@@ -39,6 +39,10 @@ final class ConfigWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     private let actions: ConfigActions
 
+    /// Fired true when the window is shown and false when it closes, so the
+    /// controller can poll telemetry only while the window is on screen.
+    var onVisibilityChange: ((Bool) -> Void)?
+
     init(actions: ConfigActions) {
         self.actions = actions
         super.init()
@@ -48,6 +52,11 @@ final class ConfigWindowController: NSObject, NSWindowDelegate {
         if window == nil { makeWindow() }
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
+        onVisibilityChange?(true)
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        onVisibilityChange?(false)
     }
 
     private func makeWindow() {

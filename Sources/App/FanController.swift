@@ -8,6 +8,14 @@
 //  close, and on quit; re-assert on wake. A heartbeat keeps the helper's
 //  watchdog satisfied only while the app is genuinely alive and in control.
 //
+//  Polling cadence is demand-driven:
+//   • The tick timer runs only when an engaging mode is active OR some UI is
+//     visible. In Disabled mode with no window/menu open, the timer is stopped
+//     entirely, so the app truly idles at ~0% CPU.
+//   • When engaged but no UI is visible, a tick does the minimum: a heartbeat
+//     (always) and, for Adaptive only, a temperatures-only read for the curve.
+//     A full sensor snapshot is taken only when UI is on screen to display it.
+//
 
 import Foundation
 import AppKit
@@ -24,7 +32,19 @@ final class FanController {
     private var installRequested = false
     private var lastAppliedTargets: [Int] = []
 
+    // Visibility of any UI that needs live telemetry.
+    private var menuVisible = false
+    private var windowVisible = false
+    private var uiVisible: Bool { menuVisible || windowVisible }
+
     private let tickInterval: TimeInterval = kHelperHeartbeatInterval
+    /// Adaptive re-apply deadband: ignore sub-threshold target drift so a slowly
+    /// varying temperature doesn't cause a continuous stream of SMC writes.
+    private let reapplyDeadbandRPM = 50
+
+    /// The timer must run while we're either controlling fans (heartbeat needed)
+    /// or showing live data. Otherwise it stops and the app idles.
+    private var shouldPoll: Bool { state.mode.engagesHelper || uiVisible }
 
     private var isHelperReady: Bool {
         if case .ready = state.helperStatus { return true }
@@ -40,14 +60,14 @@ final class FanController {
             guard let self else { return }
             self.state.helperStatus = status
             switch status {
-            case .ready:        self.applyCurrentMode(force: true)
+            case .ready:        self.applyCurrentMode()
             case .notInstalled: self.installRequested = false   // allow re-install after uninstall
             default:            break
             }
         }
         helper.onVersion = { [weak self] version in self?.state.helperVersion = version }
 
-        state.onModeChange = { [weak self] _ in self?.applyCurrentMode(force: true) }
+        state.onModeChange = { [weak self] _ in self?.applyCurrentMode() }
 
         let nc = NSWorkspace.shared.notificationCenter
         nc.addObserver(self, selector: #selector(willSleep), name: NSWorkspace.willSleepNotification, object: nil)
@@ -58,38 +78,75 @@ final class FanController {
         // first time an engaging mode actually needs it (or via the UI button).
         helper.refreshStatus()
 
-        // IMPORTANT: register the tick/heartbeat timer in `.common` run-loop
-        // modes. While the status-bar NSMenu (or any menu/modal panel) is open,
-        // AppKit runs a nested run loop in event-tracking mode; a timer in only
-        // the default mode would stop firing, the heartbeat would lapse, and the
-        // helper's watchdog would (correctly, but unexpectedly) revert fans to
-        // macOS auto after ~6 s. We also fire synchronously via assumeIsolated
-        // rather than hopping through a Task, so nothing is deferred until the
-        // nested loop exits.
-        let t = Timer(timeInterval: tickInterval, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.tick() }
-        }
-        t.tolerance = 0.5
-        RunLoop.main.add(t, forMode: .common)
-        timer = t
-        tick()
+        // One initial read so the first menu open shows data immediately, then
+        // start polling only if the current mode/visibility warrants it.
+        state.telemetry = reader.snapshot()
+        updatePolling()
     }
 
     /// Best-effort synchronous-ish release for app termination.
     func shutdown() {
-        timer?.invalidate()
-        timer = nil
+        stopTimer()
         reader.stop()
         helper.releaseControl()
         // Give the XPC message a brief window to flush before we exit.
         RunLoop.current.run(until: Date().addingTimeInterval(0.3))
     }
 
+    // MARK: UI visibility (wired from AppDelegate)
+
+    func setMenuVisible(_ visible: Bool) {
+        menuVisible = visible
+        if visible { state.telemetry = reader.snapshot() }   // fresh data for the readout
+        updatePolling()
+    }
+
+    func setWindowVisible(_ visible: Bool) {
+        windowVisible = visible
+        if visible { state.telemetry = reader.snapshot() }
+        updatePolling()
+    }
+
+    // MARK: Timer
+
+    private func updatePolling() {
+        if shouldPoll {
+            if timer == nil { startTimer() }
+        } else {
+            stopTimer()
+        }
+    }
+
+    private func startTimer() {
+        // `.common` modes so it keeps firing while a menu/modal panel is open
+        // (see safety invariant #5); `assumeIsolated` avoids an async hop that a
+        // nested run loop could defer.
+        let t = Timer(timeInterval: tickInterval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.tick() }
+        }
+        t.tolerance = 0.5
+        RunLoop.main.add(t, forMode: .common)
+        timer = t
+    }
+
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
+
     // MARK: Tick
 
     private func tick() {
-        state.telemetry = reader.snapshot()
         guard !asleep else { return }
+        if uiVisible {
+            state.telemetry = reader.snapshot()              // full read for the UI
+        } else if state.mode == .adaptive {
+            let t = reader.temperatures()                    // curve only needs temps
+            state.telemetry.cpuTemp = t.cpu
+            state.telemetry.gpuTemp = t.gpu
+            state.telemetry.batteryTemp = t.battery
+        }
+        // Performance/Silent while hidden: no SMC reads — just heartbeat below.
         drive()
     }
 
@@ -111,8 +168,8 @@ final class FanController {
             guard isHelperReady else { return }   // waiting on install / user approval
 
             let targets = targets(for: state.mode)
-            guard !targets.isEmpty else { return }   // no telemetry yet
-            if targets != lastAppliedTargets {
+            guard !targets.isEmpty else { return }   // fan bounds not resolved yet
+            if shouldReapply(targets) {
                 helper.applyFanTargets(targets)
                 lastAppliedTargets = targets
             }
@@ -121,33 +178,44 @@ final class FanController {
         }
     }
 
-    /// Force an immediate (re)apply, e.g. on mode change or helper-ready.
-    private func applyCurrentMode(force: Bool) {
-        if force { lastAppliedTargets = [] }
-        drive()
+    /// (Re)apply the current mode immediately, e.g. on mode change, helper-ready,
+    /// or wake. Also reconciles the polling timer with the new mode.
+    private func applyCurrentMode() {
+        lastAppliedTargets = []      // force the next drive() to re-apply
+        updatePolling()
+        if !asleep { drive() }
     }
 
     // MARK: Target computation
 
     private func targets(for mode: OperatingMode) -> [Int] {
-        let fans = state.telemetry.fans
-        guard !fans.isEmpty else { return [] }
+        let bounds = reader.fanBounds()
+        guard !bounds.isEmpty else { return [] }
         switch mode {
         case .disabled:
-            return fans.map { _ in kFanTargetAuto }
+            return bounds.map { _ in kFanTargetAuto }
         case .silent:
             // Attempt lowest possible; the helper clamps to each fan's floor.
             // TODO: confirm whether true 0-RPM is attainable on M-series.
-            return fans.map { _ in 0 }
+            return bounds.map { _ in 0 }
         case .performance:
-            return fans.map { $0.maxRPM }
+            return bounds.map { $0.maxRPM }
         case .adaptive:
             let frac = state.curveConfig.targetFraction(for: state.telemetry)
-            return fans.map { fan in
-                let rpm = Double(fan.minRPM) + frac * Double(max(0, fan.maxRPM - fan.minRPM))
-                return Int(rpm.rounded())
+            return bounds.map { b in
+                Int((Double(b.minRPM) + frac * Double(max(0, b.maxRPM - b.minRPM))).rounded())
             }
         }
+    }
+
+    /// True if the new targets differ enough from the last applied set to be
+    /// worth another SMC write (count change, or any fan beyond the deadband).
+    private func shouldReapply(_ new: [Int]) -> Bool {
+        guard new.count == lastAppliedTargets.count else { return true }
+        for (a, b) in zip(new, lastAppliedTargets) where abs(a - b) > reapplyDeadbandRPM {
+            return true
+        }
+        return false
     }
 
     // MARK: Sleep / wake
@@ -161,6 +229,6 @@ final class FanController {
 
     @objc private func didWake() {
         asleep = false
-        applyCurrentMode(force: true)
+        applyCurrentMode()
     }
 }
