@@ -37,8 +37,26 @@ authoritative architecture/safety doc; [[breezymac-user-preferences]] and
 ## Build order & status
 
 Steps 1–3 DONE (foundations, mode-model change, Automatic controller + settings
-tab). **NEXT = step 4 (popover + Swift Charts).** Then 5 (Adaptive AC/Battery
-curves + monotone-cubic-vs-linear), 6 (config-window restructure).
+tab). **Step 4 (popover + Swift Charts) IMPLEMENTED & building clean** (commit
+ba0546e "Step 4a"): NSMenu→NSPopover hosting a mode switcher + toggleable text
+indicators + two stacked synced charts; new `PopoverSettings` model + "Popover"
+config tab; Fans/Sensors tabs removed; Automatic "Reset to Defaults" button
+added; `TelemetrySample` gained `batteryTemp`. **On-device popover verification
+still pending** (charts render, interaction, key focus on the accessory app).
+Then 5 (Adaptive AC/Battery curves + monotone-cubic-vs-linear), 6 (config
+restructure).
+
+### Step 4 implementation choices (may revisit after on-device test)
+- Refresh interval = **display subsampling of the fixed 2 s control tick**
+  (range 2–10 s), NOT a second timer — heartbeat/watchdog cadence untouched
+  (invariants #1/#5). Control temps stay fresh between display frames.
+- Lower chart draws **one line per fan**. Palette = **Okabe–Ito** (CVD-safe):
+  CPU vermillion / GPU blue / Battery green; fans sky-blue/mauve/orange. Color
+  keyed to series identity (never cycled), via `chartForegroundStyleScale`.
+- Fixed **5-min** rolling window; only the lower chart shows x-axis labels
+  ("now"/"Nm") so the shared time axis reads as one. History accrues only on
+  display frames while the popover/window is visible (background sampling still
+  the deferred toggle).
 
 ### Step 4 spec (FINALIZED — all refinements confirmed) — status-bar NSPopover + Swift Charts
 - Replace today's status-bar **NSMenu** with a SwiftUI **NSPopover** (chillmac-
