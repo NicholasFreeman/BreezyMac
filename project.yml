@@ -11,8 +11,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"                 # Swift 5 language mode — relaxed concurrency for now
-    MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "0.1.0"
+    MARKETING_VERSION: "0.5.0"
+    CURRENT_PROJECT_VERSION: "0.5.0"
     CODE_SIGN_STYLE: Manual
     CODE_SIGN_IDENTITY: "-"              # ad-hoc for local debug
     DEVELOPMENT_TEAM: ""

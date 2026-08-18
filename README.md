@@ -33,6 +33,12 @@ It's also careful. BreezyMac only ever *borrows* control of your fans, and it
 hands that control straight back to macOS the moment it isn't actively looking
 after them — when you quit, sleep, close the lid, or switch it off.
 
+<p align="center">
+  <img src="Documentation/Screenshots/Screenshot_20260818.png" alt="BreezyMac's menu-bar popover showing live CPU/GPU temperature and fan-speed charts in Automatic mode" width="380">
+</p>
+
+<p align="center"><em>The menu-bar popover — live temperature and fan charts sharing one timeline, with one-tap mode switching. Here Automatic ramps the fans as the CPU spikes, holding a heavy load in check.</em></p>
+
 ## Features
 
 - **Four simple modes** — pick one from the menu bar:
