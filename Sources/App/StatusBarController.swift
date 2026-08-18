@@ -64,7 +64,9 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
             onQuit: { NSApp.terminate(nil) }
         ).environmentObject(state)
 
-        popover.contentViewController = NSHostingController(rootView: root)
+        let hosting = NSHostingController(rootView: root)
+        hosting.sizingOptions = [.preferredContentSize]   // popover tracks content size
+        popover.contentViewController = hosting
         popover.behavior = .transient      // closes when the user clicks away
         popover.animates = true
         popover.delegate = self
