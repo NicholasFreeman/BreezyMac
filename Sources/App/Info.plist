@@ -30,7 +30,7 @@
     <key>LSUIElement</key>
     <true/>
     <key>NSHumanReadableCopyright</key>
-    <string>© WhoCo</string>
+    <string>© 2026 Nicholas Freeman. MIT License.</string>
     <!-- Localizations shipped by the app. -->
     <key>CFBundleLocalizations</key>
     <array>

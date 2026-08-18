@@ -10,6 +10,7 @@
   <img src="https://img.shields.io/badge/platform-macOS%2026-blue" alt="Platform: macOS 26">
   <img src="https://img.shields.io/badge/chip-Apple%20Silicon-black" alt="Apple Silicon">
   <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status: alpha">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT">
 </p>
 
 ---
@@ -85,8 +86,8 @@ ServiceManagement. The only build-time tool it relies on is XcodeGen, which turn
 ## Building from source
 
 ```sh
-git clone <repository-url>
-cd WhoCo.BreezyMac
+git clone https://github.com/NicholasFreeman/BreezyMac.git
+cd BreezyMac
 make build     # generates the Xcode project, then builds a Debug, ad-hoc-signed app
 make run       # build and launch — a fan icon appears in the menu bar
 ```
@@ -143,5 +144,6 @@ back to macOS.
 This is an early **alpha** — serviceable and useful day to day, with more polish
 (a nicer visual design, release signing) still to come.
 
-No license has been chosen yet, so for now all rights are reserved. A proper
-open-source license will be picked before any general release.
+BreezyMac is released under the [MIT License](LICENSE.md) — © 2026 Nicholas
+Freeman. You're free to use, modify, and distribute it; see the license for the
+full terms.
