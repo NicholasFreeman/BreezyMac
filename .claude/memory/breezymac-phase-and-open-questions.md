@@ -62,8 +62,18 @@ building clean** (commit f981a46): `FanCurveConfig` → `interpolation` +
 an AC/Battery selector, and a live preview chart + Reset. **Refined after test:**
 user prefers smooth → **linear dropped entirely** (curves always monotone-cubic;
 Smoothing picker + dashed overlay removed); **GPU curve now enabled by default**
-per source so GPU-bound loads are protected. Next = step 6 (config restructure);
-still open: CPU/GPU-utilization inputs to the algorithms.
+per source so GPU-bound loads are protected.
+
+**Step 6 (config-window restructure) IMPLEMENTED & building clean** (commit
+c14d22a): top TabView → macOS Settings-style **NavigationSplitView sidebar**
+(General / Automatic / Adaptive / Popover / Helper / About). General now = mode
++ at-a-glance status (power/thermal/helper); **Helper install + startup split
+out** of the old General into its own page; Curve page relabeled "Adaptive";
+mode-specific pages editable regardless of active mode; window 700×480 (min
+660×470). Step-6 direction was under-specified — chose a Settings-sidebar;
+**open to redirection after on-device look.** Still open: CPU/GPU-utilization
+inputs to the algorithms; the deferred visual/aesthetic pass (translucent cards,
+animations).
 
 ### Step 4 implementation choices (may revisit after on-device test)
 - Refresh interval = **display subsampling of the fixed 2 s control tick**
