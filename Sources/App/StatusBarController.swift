@@ -78,8 +78,14 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
 
     private func showPopover() {
         guard let button = statusItem.button else { return }
+        // An accessory (LSUIElement) app that isn't active positions the popover
+        // relative to the wrong context — it can land off the top of the screen.
+        // Activating first anchors it correctly below the icon and also lets the
+        // SwiftUI controls (segmented picker, sliders) receive key/mouse events.
+        NSApp.activate(ignoringOtherApps: true)
+        // `.minY` = the icon's bottom edge, so the popover drops down from it and
+        // centers horizontally on the icon.
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        // Let the SwiftUI controls (segmented picker, sliders) take key events.
         popover.contentViewController?.view.window?.makeKey()
     }
 

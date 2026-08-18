@@ -162,9 +162,14 @@ private struct LiveCharts: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            tempChart
-            fanChart
+            if showTempChart { tempChart }
+            if settings.showFans { fanChart }
         }
+    }
+
+    /// The upper chart is shown only when at least one temperature line is on.
+    private var showTempChart: Bool {
+        settings.showCPUTemp || settings.showGPUTemp || settings.showBatteryTemp
     }
 
     // Localized series names (also legend + color-scale keys).
@@ -175,9 +180,20 @@ private struct LiveCharts: View {
         String(localized: "popover.fan", defaultValue: "Fan \(i + 1)")
     }
 
+    /// The right edge of both charts — "now". Discrete (last sample time) so the
+    /// axis steps with each refresh rather than sliding continuously.
+    private var axisEnd: Date { samples.last?.time ?? Date() }
+
     private var xDomain: ClosedRange<Date> {
-        let end = samples.last?.time ?? Date()
-        return end.addingTimeInterval(-window)...end
+        axisEnd.addingTimeInterval(-window)...axisEnd
+    }
+
+    /// Fixed tick positions at one-minute steps back from `axisEnd`. Because both
+    /// the domain and these ticks are anchored to `axisEnd`, the labels stay put
+    /// ("now" at the right, "5m" at the left) while the data scrolls underneath —
+    /// rather than the marks drifting left and relabeling as the window slides.
+    private var xTicks: [Date] {
+        stride(from: 0.0, through: window, by: 60).map { axisEnd.addingTimeInterval(-$0) }
     }
 
     // MARK: Temperatures
@@ -276,13 +292,12 @@ private struct LiveCharts: View {
         .chartXScale(domain: xDomain)
         .chartYScale(domain: fanYDomain)
         .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 4)) { value in
+            AxisMarks(values: xTicks) { value in
                 AxisGridLine()
                 AxisValueLabel {
                     if let d = value.as(Date.self) {
-                        let delta = -d.timeIntervalSince(xDomain.upperBound)
-                        Text(delta < 30 ? String(localized: "popover.now", defaultValue: "now")
-                                        : "\(Int((delta / 60).rounded()))m")
+                        let m = Int((axisEnd.timeIntervalSince(d) / 60).rounded())
+                        Text(m == 0 ? String(localized: "popover.now", defaultValue: "now") : "\(m)m")
                     }
                 }
             }
