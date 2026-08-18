@@ -40,21 +40,30 @@ Steps 1–3 DONE (foundations, mode-model change, Automatic controller + setting
 tab). **NEXT = step 4 (popover + Swift Charts).** Then 5 (Adaptive AC/Battery
 curves + monotone-cubic-vs-linear), 6 (config-window restructure).
 
-### Step 4 spec (agreed) — status-bar NSPopover with Swift Charts
+### Step 4 spec (FINALIZED — all refinements confirmed) — status-bar NSPopover + Swift Charts
 - Replace today's status-bar **NSMenu** with a SwiftUI **NSPopover** (chillmac-
-  style): mode switcher + **live Swift Charts** (native `Charts`, no dependency)
-  + Open Configuration + Quit. Refresh ~2 s (make interval configurable).
-- Charts: temperature history with **CPU / GPU / Battery** lines, and **fan
-  speed on the same timeline**. Allow **per-line show/hide** (e.g. hide battery
-  temp). Optional **text indicators** (current fan RPM, CPU/GPU temps) that users
-  can toggle on/off.
-- Add a **"Popover" config tab** with checkboxes controlling which plot lines +
-  text indicators appear.
-- **Remove the Fans and Sensors tabs** from the config window (their intent
-  moves into the popover).
-- Data: `AppState.history` rolling buffer already exists (accrues while UI
-  visible). Optional low-frequency **background sampling** to keep history warm
-  when closed is a **separate later task** (make it a toggle in the Popover tab).
+  style): mode switcher + live charts + Open Configuration + Quit. Refresh ~2 s
+  (interval configurable in the Popover tab).
+- **Charts: TWO STACKED charts sharing one synchronized time x-axis** — temps
+  (°C) on top, fan speed (RPM) below. NOT a single dual-y-axis chart (different
+  scales read as busy/misleading). Uses native `Charts` (Swift Charts), no dep.
+- Temp lines: CPU / GPU / Battery, each toggleable. **Defaults: CPU + GPU ON,
+  Battery OFF.** Fan speed shown per fan (or aggregate) on the lower chart.
+- **Text indicators**: a compact header row above the charts (current CPU/GPU
+  temp, fan RPM), each toggleable, sensible ones ON by default.
+- **Fixed rolling window** (~3–5 min, capped points) so render cost is trivial.
+- Persist the show/hide toggles + refresh interval via a new **`PopoverSettings`
+  model in AppState** (UserDefaults-backed).
+- Add a **"Popover" config tab** with the line/indicator checkboxes + refresh
+  interval + (later) a background-sampling toggle.
+- **Remove the Fans and Sensors tabs** from the config window (intent moves to
+  the popover).
+- Data source: `AppState.history` rolling buffer already exists (accrues while
+  UI visible). Low-frequency **background sampling** to keep history warm when
+  closed is a **separate later task** (toggle in the Popover tab).
+- Nice-to-have: a **"Reset to defaults" button** for Automatic (its default
+  anticipation changed to 0.15, and there's currently no way back without
+  clearing prefs).
 
 ## Deferred / later
 Step 5 Adaptive AC+Battery curves & monotone-cubic; step 6 config restructure;
