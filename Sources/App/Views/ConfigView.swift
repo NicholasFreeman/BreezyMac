@@ -2,8 +2,10 @@
 //  ConfigView.swift
 //  BreezyMac — App
 //
-//  The tabbed configuration window. Sections: General (mode + helper), Fans
-//  (live telemetry), Curve (Adaptive-mode editor), Sensors, and About. This is
+//  The tabbed configuration window. Sections: General (mode + helper), Automatic
+//  (anti-throttle setpoints), Curve (Adaptive-mode editor), Popover (live-chart
+//  toggles + refresh), and About. Live telemetry now lives in the status-bar
+//  popover, so the former Fans and Sensors tabs were removed. This is
 //  intentionally a functional-but-minimal scaffold; the elegant visual pass
 //  (translucent cards, animations) comes later, informed by the ChillMac look.
 //
@@ -20,12 +22,10 @@ struct ConfigView: View {
                 .tabItem { Label(String(localized: "tab.general", defaultValue: "General"), systemImage: "gearshape") }
             AutomaticTab()
                 .tabItem { Label(String(localized: "tab.automatic", defaultValue: "Automatic"), systemImage: "gauge.medium") }
-            FansTab()
-                .tabItem { Label(String(localized: "tab.fans", defaultValue: "Fans"), systemImage: "fanblades") }
             CurveTab()
                 .tabItem { Label(String(localized: "tab.curve", defaultValue: "Curve"), systemImage: "chart.xyaxis.line") }
-            SensorsTab()
-                .tabItem { Label(String(localized: "tab.sensors", defaultValue: "Sensors"), systemImage: "thermometer.medium") }
+            PopoverTab()
+                .tabItem { Label(String(localized: "tab.popover", defaultValue: "Popover"), systemImage: "chart.bar.xaxis") }
             AboutTab()
                 .tabItem { Label(String(localized: "tab.about", defaultValue: "About"), systemImage: "info.circle") }
         }
@@ -146,6 +146,14 @@ private struct AutomaticTab: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
+            Section {
+                Button {
+                    state.automaticConfig = .default
+                } label: {
+                    Label(String(localized: "auto.reset", defaultValue: "Reset to Defaults"), systemImage: "arrow.counterclockwise")
+                }
+                .disabled(state.automaticConfig == .default)
+            }
         }
         .formStyle(.grouped)
     }
@@ -202,43 +210,50 @@ private func thermalStateColor(_ s: ProcessInfo.ThermalState) -> Color {
     }
 }
 
-// MARK: - Fans
+// MARK: - Popover
 
-private struct FansTab: View {
+private struct PopoverTab: View {
     @EnvironmentObject var state: AppState
 
     var body: some View {
-        Group {
-            if state.telemetry.fans.isEmpty {
-                ContentUnavailableView(String(localized: "fans.none", defaultValue: "No fans detected"),
-                                       systemImage: "fanblades",
-                                       description: Text(String(localized: "fans.none.detail", defaultValue: "Sensor data will appear here once available.")))
-            } else {
-                List(state.telemetry.fans) { fan in
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text(fan.name).font(.headline)
-                            Spacer()
-                            Text("\(fan.actualRPM) RPM").monospacedDigit().foregroundStyle(Theme.accent)
-                        }
-                        ProgressView(value: fanFraction(fan))
-                        HStack {
-                            Text("min \(fan.minRPM)").font(.caption).foregroundStyle(.secondary)
-                            Spacer()
-                            Text("target \(fan.targetRPM)").font(.caption).foregroundStyle(.secondary)
-                            Spacer()
-                            Text("max \(fan.maxRPM)").font(.caption).foregroundStyle(.secondary)
-                        }
+        Form {
+            Section(String(localized: "popover.tempLines", defaultValue: "Temperature Lines")) {
+                Toggle(String(localized: "sensor.cpu", defaultValue: "CPU"), isOn: $state.popoverSettings.showCPUTemp)
+                Toggle(String(localized: "sensor.gpu", defaultValue: "GPU"), isOn: $state.popoverSettings.showGPUTemp)
+                Toggle(String(localized: "sensor.battery", defaultValue: "Battery"), isOn: $state.popoverSettings.showBatteryTemp)
+            }
+            Section(String(localized: "popover.fanLines", defaultValue: "Fan Speed")) {
+                Toggle(String(localized: "popover.showFans", defaultValue: "Show fan speed"), isOn: $state.popoverSettings.showFans)
+            }
+            Section(String(localized: "popover.indicators", defaultValue: "Header Indicators")) {
+                Toggle(String(localized: "popover.indicator.cpu", defaultValue: "CPU temperature"), isOn: $state.popoverSettings.showCPUIndicator)
+                Toggle(String(localized: "popover.indicator.gpu", defaultValue: "GPU temperature"), isOn: $state.popoverSettings.showGPUIndicator)
+                Toggle(String(localized: "popover.indicator.fan", defaultValue: "Fan speed"), isOn: $state.popoverSettings.showFanIndicator)
+            }
+            Section(String(localized: "popover.refresh", defaultValue: "Refresh")) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(String(localized: "popover.refreshRate", defaultValue: "Chart refresh"))
+                        Spacer()
+                        Text(String(format: "%.0f s", state.popoverSettings.refreshInterval))
+                            .monospacedDigit().foregroundStyle(Theme.accent)
                     }
-                    .padding(.vertical, 4)
+                    Slider(value: $state.popoverSettings.refreshInterval,
+                           in: PopoverSettings.minRefreshInterval...PopoverSettings.maxRefreshInterval,
+                           step: 1)
+                    Text(String(localized: "popover.refresh.help", defaultValue: "How often the live charts update while the popover is open."))
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
+            Section {
+                Toggle(String(localized: "popover.background", defaultValue: "Keep history while closed"),
+                       isOn: $state.popoverSettings.backgroundSampling)
+                    .disabled(true)
+                Text(String(localized: "popover.background.help", defaultValue: "Background sampling to keep the charts warm while the popover is closed arrives in a later update."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
-    }
-
-    private func fanFraction(_ fan: FanReading) -> Double {
-        let span = Double(max(1, fan.maxRPM - fan.minRPM))
-        return min(1, max(0, Double(fan.actualRPM - fan.minRPM) / span))
+        .formStyle(.grouped)
     }
 }
 
@@ -269,43 +284,6 @@ private struct CurveTab: View {
             }
         }
         .formStyle(.grouped)
-    }
-}
-
-// MARK: - Sensors
-
-private struct SensorsTab: View {
-    @EnvironmentObject var state: AppState
-
-    var body: some View {
-        Form {
-            Section(String(localized: "sensors.temps", defaultValue: "Temperatures")) {
-                tempRow(String(localized: "sensor.cpu", defaultValue: "CPU"), state.telemetry.cpuTemp)
-                tempRow(String(localized: "sensor.gpu", defaultValue: "GPU"), state.telemetry.gpuTemp)
-                tempRow(String(localized: "sensor.battery", defaultValue: "Battery"), state.telemetry.batteryTemp)
-            }
-            Section(String(localized: "sensors.system", defaultValue: "System")) {
-                LabeledContent(String(localized: "sensors.power", defaultValue: "Power source"), value: state.powerSource.displayName)
-                LabeledContent(String(localized: "sensors.thermal", defaultValue: "Thermal state")) {
-                    Text(thermalStateName(state.thermalState)).foregroundStyle(thermalStateColor(state.thermalState))
-                }
-            }
-            Section {
-                Text(String(localized: "sensors.usageNote", defaultValue: "CPU/GPU utilization inputs for the adaptive algorithm will be surfaced here in a later iteration."))
-                    .font(.callout).foregroundStyle(.secondary)
-            }
-        }
-        .formStyle(.grouped)
-    }
-
-    private func tempRow(_ label: String, _ value: Double?) -> some View {
-        LabeledContent(label) {
-            if let v = value {
-                Text(String(format: "%.1f°C", v)).monospacedDigit().foregroundStyle(Theme.temperatureColor(v))
-            } else {
-                Text("—").foregroundStyle(.secondary)
-            }
-        }
     }
 }
 

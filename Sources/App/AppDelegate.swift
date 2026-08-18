@@ -27,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let bar = StatusBarController()
         bar.onOpenConfiguration = { [weak config] in config?.show() }
-        bar.onMenuVisibilityChange = { [weak self] visible in self?.controller.setMenuVisible(visible) }
+        bar.onPopoverVisibilityChange = { [weak self] visible in self?.controller.setPopoverVisible(visible) }
         statusBar = bar
 
         controller.start()

@@ -32,6 +32,10 @@ final class AppState: ObservableObject {
         didSet { persistAutomatic() }
     }
 
+    @Published var popoverSettings: PopoverSettings {
+        didSet { persistPopover() }
+    }
+
     // MARK: Live state (updated by controllers)
 
     @Published var telemetry = TelemetrySnapshot()
@@ -51,6 +55,7 @@ final class AppState: ObservableObject {
         static let mode = "operatingMode"
         static let curve = "fanCurveConfig"
         static let automatic = "automaticConfig"
+        static let popover = "popoverSettings"
     }
 
     private init() {
@@ -73,6 +78,13 @@ final class AppState: ObservableObject {
         } else {
             automaticConfig = .default
         }
+
+        if let data = defaults.data(forKey: Keys.popover),
+           let cfg = try? JSONDecoder().decode(PopoverSettings.self, from: data) {
+            popoverSettings = cfg
+        } else {
+            popoverSettings = .default
+        }
     }
 
     private func persistCurve() {
@@ -87,11 +99,18 @@ final class AppState: ObservableObject {
         }
     }
 
+    private func persistPopover() {
+        if let data = try? JSONEncoder().encode(popoverSettings) {
+            defaults.set(data, forKey: Keys.popover)
+        }
+    }
+
     /// Append a sample to the rolling history buffer, trimming to the limit.
     func appendHistory(from snapshot: TelemetrySnapshot) {
         history.append(TelemetrySample(time: Date(),
                                        cpuTemp: snapshot.cpuTemp,
                                        gpuTemp: snapshot.gpuTemp,
+                                       batteryTemp: snapshot.batteryTemp,
                                        fanRPMs: snapshot.fans.map { $0.actualRPM }))
         if history.count > historyLimit {
             history.removeFirst(history.count - historyLimit)

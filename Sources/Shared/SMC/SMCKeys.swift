@@ -59,6 +59,7 @@ struct TelemetrySample: Equatable, Sendable, Identifiable {
     let time: Date
     let cpuTemp: Double?
     let gpuTemp: Double?
+    let batteryTemp: Double?
     let fanRPMs: [Int]
 }
 

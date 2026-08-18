@@ -2,40 +2,42 @@
 //  StatusBarController.swift
 //  BreezyMac — App
 //
-//  The always-visible status-bar item: a quick mode switcher, a compact live
-//  readout, and access to the configuration window. This is the only UI shown
-//  during normal operation (no Dock icon — see Info.plist LSUIElement).
+//  The always-visible status-bar item. Clicking it toggles a SwiftUI popover
+//  (mode switcher + live charts + Open Configuration / Quit) — this is the only
+//  UI shown during normal operation (no Dock icon — see Info.plist LSUIElement).
+//
+//  We use an NSPopover rather than an NSMenu so the readout can host live Swift
+//  Charts. A popover is non-modal, so unlike a menu it does not spin a nested
+//  event-tracking run loop; the heartbeat timer keeps firing normally (safety
+//  invariant #5), and FanController is told when it opens/closes so telemetry is
+//  polled only while it is on screen.
 //
 
 import AppKit
+import SwiftUI
 import Combine
 
 @MainActor
-final class StatusBarController: NSObject, NSMenuDelegate {
+final class StatusBarController: NSObject, NSPopoverDelegate {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-    private let menu = NSMenu()
+    private let popover = NSPopover()
     private let state = AppState.shared
     private var cancellables = Set<AnyCancellable>()
 
     var onOpenConfiguration: (() -> Void)?
-    /// Fired true just before the menu displays and false when it closes, so the
-    /// controller can poll telemetry only while the menu is on screen.
-    var onMenuVisibilityChange: ((Bool) -> Void)?
-
-    private var modeItems: [NSMenuItem] = []
-    private let readoutItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+    /// Fired true just before the popover displays and false when it closes, so
+    /// the controller polls telemetry only while it is on screen.
+    var onPopoverVisibilityChange: ((Bool) -> Void)?
 
     override init() {
         super.init()
         configureButton()
-        buildMenu()
-        menu.delegate = self
-        statusItem.menu = menu
+        configurePopover()
 
-        // Keep the status-bar glyph/checkmarks in step with mode changes.
+        // Keep the status-bar glyph in step with mode changes.
         state.$mode
             .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.refreshDynamicState() }
+            .sink { [weak self] _ in self?.refreshButton() }
             .store(in: &cancellables)
     }
 
@@ -49,84 +51,55 @@ final class StatusBarController: NSObject, NSMenuDelegate {
             button.image = NSImage(systemSymbolName: "fanblades", accessibilityDescription: "BreezyMac")
         }
         button.toolTip = "BreezyMac"
+        button.action = #selector(togglePopover(_:))
+        button.target = self
     }
 
-    private func buildMenu() {
-        let title = NSMenuItem(title: "BreezyMac", action: nil, keyEquivalent: "")
-        title.isEnabled = false
-        menu.addItem(title)
-        menu.addItem(.separator())
+    private func configurePopover() {
+        let root = PopoverView(
+            onOpenConfiguration: { [weak self] in
+                self?.closePopover()
+                self?.onOpenConfiguration?()
+            },
+            onQuit: { NSApp.terminate(nil) }
+        ).environmentObject(state)
 
-        for (index, mode) in OperatingMode.allCases.enumerated() {
-            let item = NSMenuItem(title: mode.displayName, action: #selector(selectMode(_:)), keyEquivalent: "")
-            item.target = self
-            item.tag = index
-            item.image = NSImage(systemSymbolName: mode.symbolName, accessibilityDescription: nil)
-            menu.addItem(item)
-            modeItems.append(item)
-        }
-
-        menu.addItem(.separator())
-        readoutItem.isEnabled = false
-        menu.addItem(readoutItem)
-        menu.addItem(.separator())
-
-        let config = NSMenuItem(title: String(localized: "menu.openConfiguration", defaultValue: "Open Configuration…"),
-                                action: #selector(openConfiguration), keyEquivalent: ",")
-        config.target = self
-        menu.addItem(config)
-
-        let quit = NSMenuItem(title: String(localized: "menu.quit", defaultValue: "Quit BreezyMac"),
-                              action: #selector(quit), keyEquivalent: "q")
-        quit.target = self
-        menu.addItem(quit)
+        popover.contentViewController = NSHostingController(rootView: root)
+        popover.behavior = .transient      // closes when the user clicks away
+        popover.animates = true
+        popover.delegate = self
     }
 
     // MARK: Actions
 
-    @objc private func selectMode(_ sender: NSMenuItem) {
-        let modes = OperatingMode.allCases
-        guard sender.tag >= 0, sender.tag < modes.count else { return }
-        state.mode = modes[sender.tag]
+    @objc private func togglePopover(_ sender: Any?) {
+        if popover.isShown { closePopover() } else { showPopover() }
     }
 
-    @objc private func openConfiguration() {
-        onOpenConfiguration?()
+    private func showPopover() {
+        guard let button = statusItem.button else { return }
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        // Let the SwiftUI controls (segmented picker, sliders) take key events.
+        popover.contentViewController?.view.window?.makeKey()
     }
 
-    @objc private func quit() {
-        NSApp.terminate(nil)
+    private func closePopover() {
+        popover.performClose(nil)
     }
 
-    // MARK: NSMenuDelegate
+    // MARK: NSPopoverDelegate
 
-    func menuNeedsUpdate(_ menu: NSMenu) {
-        onMenuVisibilityChange?(true)   // refresh telemetry before we read it below
-        refreshDynamicState()
+    func popoverWillShow(_ notification: Notification) {
+        onPopoverVisibilityChange?(true)   // start polling / seed fresh telemetry
     }
 
-    func menuDidClose(_ menu: NSMenu) {
-        onMenuVisibilityChange?(false)
+    func popoverDidClose(_ notification: Notification) {
+        onPopoverVisibilityChange?(false)
     }
 
-    private func refreshDynamicState() {
-        let modes = OperatingMode.allCases
-        for (index, item) in modeItems.enumerated() {
-            item.state = (modes[index] == state.mode) ? .on : .off
-        }
-        readoutItem.title = readoutText()
-    }
-
-    private func readoutText() -> String {
-        let t = state.telemetry
-        var parts: [String] = []
-        if let cpu = t.cpuTemp {
-            parts.append(String(format: "CPU %.0f°C", cpu))
-        }
-        if let fan = t.fans.first {
-            parts.append("\(fan.actualRPM) RPM")
-        }
-        if parts.isEmpty { return String(localized: "menu.noReadings", defaultValue: "Reading sensors…") }
-        return parts.joined(separator: "   ·   ")
+    private func refreshButton() {
+        // Placeholder for a mode-tinted glyph in the later design pass; the
+        // popover itself already reflects the active mode.
+        statusItem.button?.toolTip = "BreezyMac — \(state.mode.displayName)"
     }
 }

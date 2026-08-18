@@ -35,9 +35,14 @@ final class FanController {
     private var lastAppliedTargets: [Int] = []
 
     // Visibility of any UI that needs live telemetry.
-    private var menuVisible = false
+    private var popoverVisible = false
     private var windowVisible = false
-    private var uiVisible: Bool { menuVisible || windowVisible }
+    private var uiVisible: Bool { popoverVisible || windowVisible }
+
+    /// When the charts last took a full display refresh. The control tick fires
+    /// every `kHelperHeartbeatInterval`; display refreshes are subsampled from it
+    /// at the user's chosen `PopoverSettings.refreshInterval` (never faster).
+    private var lastDisplayRefresh: Date = .distantPast
 
     private let tickInterval: TimeInterval = kHelperHeartbeatInterval
     /// Adaptive re-apply deadband: ignore sub-threshold target drift so a slowly
@@ -128,16 +133,24 @@ final class FanController {
 
     // MARK: UI visibility (wired from AppDelegate)
 
-    func setMenuVisible(_ visible: Bool) {
-        menuVisible = visible
-        if visible { state.telemetry = reader.snapshot() }   // fresh data for the readout
+    func setPopoverVisible(_ visible: Bool) {
+        popoverVisible = visible
+        if visible { refreshDisplay() }   // fresh charts the instant the popover opens
         updatePolling()
     }
 
     func setWindowVisible(_ visible: Bool) {
         windowVisible = visible
-        if visible { state.telemetry = reader.snapshot() }
+        if visible { refreshDisplay() }
         updatePolling()
+    }
+
+    /// Take a full snapshot for the UI and record it in history, stamping the
+    /// display-refresh clock so the throttled tick doesn't immediately repeat it.
+    private func refreshDisplay() {
+        state.telemetry = reader.snapshot()
+        state.appendHistory(from: state.telemetry)
+        lastDisplayRefresh = Date()
     }
 
     // MARK: Timer
@@ -173,20 +186,32 @@ final class FanController {
         guard !asleep else { return }
         state.thermalState = ProcessInfo.processInfo.thermalState
 
-        var refreshed = false
         if uiVisible {
-            state.telemetry = reader.snapshot()              // full read for the UI
-            refreshed = true
+            // Refresh the charts at the user's chosen cadence, subsampling this
+            // fixed 2 s tick. Between display frames we still keep control temps
+            // fresh so Automatic/Adaptive never act on stale readings.
+            let now = Date()
+            let due = now.timeIntervalSince(lastDisplayRefresh) >= state.popoverSettings.refreshInterval - 0.25
+            if due {
+                state.telemetry = reader.snapshot()          // full read for the UI
+                state.appendHistory(from: state.telemetry)
+                lastDisplayRefresh = now
+            } else if state.mode.needsTemperature {
+                refreshControlTemps()
+            }
         } else if state.mode.needsTemperature {
-            let t = reader.temperatures()                    // Automatic/Adaptive need temps
-            state.telemetry.cpuTemp = t.cpu
-            state.telemetry.gpuTemp = t.gpu
-            state.telemetry.batteryTemp = t.battery
-            refreshed = true
+            refreshControlTemps()                            // Automatic/Adaptive need temps while hidden
         }
-        // Performance while hidden: no SMC reads — just heartbeat below.
-        if refreshed { state.appendHistory(from: state.telemetry) }
+        // Performance while hidden: no SMC reads — just the heartbeat in drive().
         drive()
+    }
+
+    /// Minimal temps-only read to feed the control loop between display frames.
+    private func refreshControlTemps() {
+        let t = reader.temperatures()
+        state.telemetry.cpuTemp = t.cpu
+        state.telemetry.gpuTemp = t.gpu
+        state.telemetry.batteryTemp = t.battery
     }
 
     private func drive() {
