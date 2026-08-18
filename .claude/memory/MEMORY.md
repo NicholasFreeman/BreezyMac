@@ -1,4 +1,5 @@
 # Memory Index
 
-- [BreezyMac phase & open questions](breezymac-phase-and-open-questions.md) — scaffolding done; design Q&A next; decisions awaiting user
+- [BreezyMac phase & next steps](breezymac-phase-and-open-questions.md) — current mode model, tuning outcomes, and the step-4 popover spec
+- [BreezyMac user preferences](breezymac-user-preferences.md) — use-case (anti-throttle), design tastes, tuning preferences, git identity
 - [BreezyMac reference projects](breezymac-reference-projects.md) — reuse vs avoid from Fanny + ChillMac
