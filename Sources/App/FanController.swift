@@ -269,7 +269,7 @@ final class FanController {
                                           now: Date())
             return bounds.map { fraction(frac, of: $0) }
         case .adaptive:
-            let frac = state.curveConfig.targetFraction(for: state.telemetry)
+            let frac = state.curveConfig.targetFraction(for: state.telemetry, source: state.powerSource)
             return bounds.map { fraction(frac, of: $0) }
         }
     }

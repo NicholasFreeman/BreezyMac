@@ -11,6 +11,7 @@
 //
 
 import SwiftUI
+import Charts
 
 struct ConfigView: View {
     @EnvironmentObject var state: AppState
@@ -261,29 +262,153 @@ private struct PopoverTab: View {
 
 private struct CurveTab: View {
     @EnvironmentObject var state: AppState
+    @State private var editingSource: PowerSource = .ac
 
     var body: some View {
         Form {
-            Text(String(localized: "curve.note", defaultValue: "Adaptive mode drives fans from these curves. The highest resulting speed across enabled curves wins."))
-                .font(.callout).foregroundStyle(.secondary)
-
-            ForEach($state.curveConfig.curves) { $curve in
-                Section(curve.source.displayName) {
-                    Toggle(String(localized: "curve.enabled", defaultValue: "Enabled"), isOn: $curve.enabled)
-                    ForEach($curve.points) { $point in
-                        VStack(alignment: .leading) {
-                            HStack {
-                                Text(String(format: "%.0f°C", point.temperature)).monospacedDigit()
-                                Spacer()
-                                Text(String(format: "%.0f%%", point.speedPercent)).monospacedDigit().foregroundStyle(Theme.accent)
-                            }
-                            Slider(value: $point.speedPercent, in: 0...100, step: 5)
-                        }
+            Section {
+                Text(String(localized: "curve.note", defaultValue: "Adaptive mode drives fans from these curves. The highest resulting speed across enabled curves wins."))
+                    .font(.callout).foregroundStyle(.secondary)
+                Picker(String(localized: "curve.smoothing", defaultValue: "Smoothing"),
+                       selection: $state.curveConfig.interpolation) {
+                    ForEach(CurveInterpolation.allCases, id: \.self) { mode in
+                        Text(mode.displayName).tag(mode)
                     }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Section {
+                Picker(String(localized: "curve.editing", defaultValue: "Editing"), selection: $editingSource) {
+                    Text(PowerSource.ac.displayName).tag(PowerSource.ac)
+                    Text(PowerSource.battery.displayName).tag(PowerSource.battery)
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Section(String(localized: "curve.preview", defaultValue: "Preview")) {
+                CurvePreview(curves: state.curveConfig.curves(for: editingSource),
+                             interpolation: state.curveConfig.interpolation)
+                Text(String(localized: "curve.preview.hint", defaultValue: "Solid = active smoothing; dashed = the other, for comparison."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+            if editingSource == .ac {
+                curveEditor($state.curveConfig.ac)
+            } else {
+                curveEditor($state.curveConfig.battery)
+            }
+
+            Section {
+                Button {
+                    state.curveConfig = .default
+                } label: {
+                    Label(String(localized: "curve.reset", defaultValue: "Reset to Defaults"), systemImage: "arrow.counterclockwise")
                 }
             }
         }
         .formStyle(.grouped)
+    }
+
+    @ViewBuilder
+    private func curveEditor(_ curves: Binding<[FanCurve]>) -> some View {
+        ForEach(curves) { $curve in
+            Section(curve.source.displayName) {
+                Toggle(String(localized: "curve.enabled", defaultValue: "Enabled"), isOn: $curve.enabled)
+                ForEach($curve.points) { $point in
+                    VStack(alignment: .leading) {
+                        HStack {
+                            Text(String(format: "%.0f°C", point.temperature)).monospacedDigit()
+                            Spacer()
+                            Text(String(format: "%.0f%%", point.speedPercent)).monospacedDigit().foregroundStyle(Theme.accent)
+                        }
+                        Slider(value: $point.speedPercent, in: 0...100, step: 5)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// A read-only preview of the enabled curves for one power source. Each curve is
+/// sampled from the model itself (so it exactly reflects the control math) in the
+/// active interpolation (solid) plus the alternative one (dashed) for comparison.
+private struct CurvePreview: View {
+    let curves: [FanCurve]
+    let interpolation: CurveInterpolation
+
+    private let domain: ClosedRange<Double> = 30...105
+
+    private struct Sample: Identifiable { let id: Int; let temp: Double; let pct: Double }
+
+    private func samples(_ curve: FanCurve, _ mode: CurveInterpolation) -> [Sample] {
+        stride(from: domain.lowerBound, through: domain.upperBound, by: 1).enumerated().map { i, t in
+            Sample(id: i, temp: t, pct: curve.speedPercent(forTemperature: t, interpolation: mode))
+        }
+    }
+
+    private func color(_ source: ThermalSource) -> Color {
+        switch source {
+        case .cpu:     return PopoverPalette.cpu
+        case .gpu:     return PopoverPalette.gpu
+        case .battery: return PopoverPalette.battery
+        }
+    }
+
+    private var enabled: [FanCurve] { curves.filter(\.enabled) }
+    private var alternative: CurveInterpolation { interpolation == .linear ? .smooth : .linear }
+
+    var body: some View {
+        Group {
+            if enabled.isEmpty {
+                Text(String(localized: "curve.preview.none", defaultValue: "No curves enabled for this power source."))
+                    .font(.callout).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 120)
+            } else {
+                Chart {
+                    ForEach(enabled) { curve in
+                        // Alternative smoothing — faint dashed, drawn first (behind).
+                        ForEach(samples(curve, alternative)) { s in
+                            LineMark(x: .value("°C", s.temp), y: .value("%", s.pct),
+                                     series: .value("series", "\(curve.id)-alt"))
+                                .foregroundStyle(color(curve.source).opacity(0.35))
+                                .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                        }
+                        // Active smoothing — solid.
+                        ForEach(samples(curve, interpolation)) { s in
+                            LineMark(x: .value("°C", s.temp), y: .value("%", s.pct),
+                                     series: .value("series", "\(curve.id)-active"))
+                                .foregroundStyle(color(curve.source))
+                        }
+                        // Control points.
+                        ForEach(curve.points) { p in
+                            PointMark(x: .value("°C", p.temperature), y: .value("%", p.speedPercent))
+                                .foregroundStyle(color(curve.source))
+                                .symbolSize(26)
+                        }
+                    }
+                }
+                .chartXScale(domain: domain)
+                .chartYScale(domain: 0...100)
+                .chartXAxis {
+                    AxisMarks(values: .stride(by: 15)) { value in
+                        AxisGridLine()
+                        AxisValueLabel {
+                            if let v = value.as(Double.self) { Text("\(Int(v))°") }
+                        }
+                    }
+                }
+                .chartYAxis {
+                    AxisMarks(values: [0, 25, 50, 75, 100]) { value in
+                        AxisGridLine()
+                        AxisValueLabel {
+                            if let v = value.as(Double.self) { Text("\(Int(v))%") }
+                        }
+                    }
+                }
+                .frame(height: 170)
+            }
+        }
     }
 }
 
