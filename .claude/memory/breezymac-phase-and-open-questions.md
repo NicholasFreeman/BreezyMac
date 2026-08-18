@@ -34,6 +34,14 @@ authoritative architecture/safety doc; [[breezymac-user-preferences]] and
 - Added a **guard so Automatic target stays ≥5 °C below ceiling** (setting
   ceiling<target caused fan oscillation).
 - Power-source switch verified live (unplug → battery config, replug → AC).
+- **Hot-spot sensor fix (commit 8ea46ce):** temps previously read ONE sensor
+  (first plausible key in a fallback list, e.g. `Tp09`) → missed the throttle
+  hot spot (a GPU-bound load throttled while our reading stayed "in range").
+  Now `SMCReader` enumerates the SMC once (`#KEY` + read-by-index) and reads the
+  **MAX** across the Apple-Silicon die sensors — `Tp`/`Te` (CPU cores), `Tg`
+  (GPU) — every tick; Intel/none falls back to the curated lists. Logs resolved
+  keys once via NSLog for on-device verification. **Pending user re-test.** If a
+  group resolves to odd/empty keys, refine the prefix filter.
 
 ## Build order & status
 
@@ -51,10 +59,11 @@ building clean** (commit f981a46): `FanCurveConfig` → `interpolation` +
 `ac`/`battery` curve sets; `targetFraction(for:source:)`; new
 `CurveInterpolation {linear, smooth}` where smooth = monotone-cubic
 (Fritsch–Carlson), default smooth; Curve tab rewritten with a Smoothing picker,
-an AC/Battery selector, and a live preview chart (active solid + alternative
-dashed, sampled from the model) + Reset. **On-device Adaptive verification
-pending** (curve behavior, which smoothing to keep). Next = step 6 (config
-restructure); still open: CPU/GPU-utilization inputs to the algorithms.
+an AC/Battery selector, and a live preview chart + Reset. **Refined after test:**
+user prefers smooth → **linear dropped entirely** (curves always monotone-cubic;
+Smoothing picker + dashed overlay removed); **GPU curve now enabled by default**
+per source so GPU-bound loads are protected. Next = step 6 (config restructure);
+still open: CPU/GPU-utilization inputs to the algorithms.
 
 ### Step 4 implementation choices (may revisit after on-device test)
 - Refresh interval = **display subsampling of the fixed 2 s control tick**
