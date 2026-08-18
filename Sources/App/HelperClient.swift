@@ -31,8 +31,19 @@ final class HelperClient {
     private let service = SMAppService.daemon(plistName: "org.WhoCo.BreezyMac.Helper.plist")
     private var connection: NSXPCConnection?
 
+    // Approval-watch: after `.requiresApproval`, poll the service status so we
+    // flip to Ready the moment the user enables it in Login Items — no relaunch.
+    private var approvalTimer: Timer?
+    private let approvalPollInterval: TimeInterval = 2.5
+    private let approvalPollBudget = 48        // ~2 minutes total
+
     var onStatusChange: ((HelperStatus) -> Void)?
     var onVersion: ((String) -> Void)?
+    /// Fired when the XPC connection is interrupted or invalidated, so the
+    /// controller can force a re-apply of targets to the (possibly respawned)
+    /// helper — otherwise a restarted daemon would sit on macOS-auto while the
+    /// UI still shows an engaged mode.
+    var onConnectionLost: (() -> Void)?
 
     private func setStatus(_ status: HelperStatus) { onStatusChange?(status) }
 
@@ -56,6 +67,8 @@ final class HelperClient {
             verifyThenReady()
         case .requiresApproval:
             setStatus(.requiresApproval)
+            openLoginItemsSettings()      // point the user at the toggle…
+            startApprovalWatch()          // …and pick up their approval live
         case .notRegistered, .notFound:
             setStatus(.failed("Helper could not be registered (status: \(statusName(service.status)))."))
         @unknown default:
@@ -65,9 +78,43 @@ final class HelperClient {
 
     /// Remove the daemon entirely (used by an explicit "Uninstall Helper").
     func uninstall() {
+        stopApprovalWatch()
         disconnect()
         try? service.unregister()
         setStatus(.notInstalled)
+    }
+
+    // MARK: Approval watch
+
+    private func startApprovalWatch() {
+        stopApprovalWatch()
+        var remaining = approvalPollBudget
+        let t = Timer(timeInterval: approvalPollInterval, repeats: true) { [weak self] timer in
+            MainActor.assumeIsolated {
+                guard let self else { timer.invalidate(); return }
+                remaining -= 1
+                switch self.service.status {
+                case .enabled:
+                    self.stopApprovalWatch()
+                    self.verifyThenReady()          // connect + version handshake → .ready
+                case .requiresApproval:
+                    if remaining <= 0 { self.stopApprovalWatch() }   // give up quietly; button still works
+                case .notRegistered, .notFound:
+                    self.stopApprovalWatch()
+                    self.setStatus(.notInstalled)
+                @unknown default:
+                    if remaining <= 0 { self.stopApprovalWatch() }
+                }
+            }
+        }
+        // .common so it keeps polling even while a menu/settings panel is open.
+        RunLoop.main.add(t, forMode: .common)
+        approvalTimer = t
+    }
+
+    private func stopApprovalWatch() {
+        approvalTimer?.invalidate()
+        approvalTimer = nil
     }
 
     func refreshStatus() {
@@ -104,10 +151,16 @@ final class HelperClient {
             conn = NSXPCConnection(machServiceName: kHelperMachServiceName, options: .privileged)
             conn.remoteObjectInterface = NSXPCInterface(with: HelperProtocol.self)
             conn.invalidationHandler = { [weak self] in
-                Task { @MainActor in self?.connection = nil }
+                Task { @MainActor in
+                    self?.connection = nil
+                    self?.onConnectionLost?()
+                }
             }
-            conn.interruptionHandler = {
-                NSLog("BreezyMac: helper XPC connection interrupted")
+            conn.interruptionHandler = { [weak self] in
+                NSLog("BreezyMac: helper XPC connection interrupted (daemon likely respawning)")
+                // Same connection object is reused when launchd respawns the
+                // daemon; force the controller to re-apply targets to it.
+                Task { @MainActor in self?.onConnectionLost?() }
             }
             conn.resume()
             connection = conn
@@ -116,6 +169,7 @@ final class HelperClient {
     }
 
     func disconnect() {
+        stopApprovalWatch()
         connection?.invalidate()
         connection = nil
     }

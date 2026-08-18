@@ -31,6 +31,15 @@ run loop; the timer was only in default mode) → watchdog reverted fans after
 ~6 s. Fixed by registering the tick timer in `.common` run-loop modes and firing
 via `MainActor.assumeIsolated`. This is now safety invariant #5 in CLAUDE.md.
 
-**Next up:** Adaptive curve-editor UX + CPU/GPU-usage inputs; then (deferred)
-Silent 0-RPM, release signing/notarization, Swift 6 mode. See
-[[breezymac-reference-projects]].
+**Post-scaffolding work done (2026-08-16):** demand-driven polling (app idles
+~0.5–0.8% with UI open, ~0% when Disabled+closed); live approval pickup so
+enabling the helper in Login Items no longer needs an app relaunch; re-assert
+of fan targets when the XPC connection drops / daemon respawns.
+
+**Next up:** Adaptive curve model + editor UX (#3) — user is choosing a
+graphing/widget library (looking at what idevtim.chillmac uses) and is
+reconsidering whether plain linear interpolation is the right curve shape
+(monotone-cubic / eased response under discussion). Also pending: CPU/GPU-usage
+inputs to the algorithm, a few unit tests for the pure logic (FanCurve,
+SMCDecode). Deferred: Silent 0-RPM, release signing/notarization, Swift 6 mode.
+See [[breezymac-reference-projects]].

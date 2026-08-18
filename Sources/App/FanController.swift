@@ -67,6 +67,10 @@ final class FanController {
         }
         helper.onVersion = { [weak self] version in self?.state.helperVersion = version }
 
+        // If the XPC connection drops (daemon respawn), force the next tick to
+        // re-apply targets to the freshly-started, control-released helper.
+        helper.onConnectionLost = { [weak self] in self?.lastAppliedTargets = [] }
+
         state.onModeChange = { [weak self] _ in self?.applyCurrentMode() }
 
         let nc = NSWorkspace.shared.notificationCenter
