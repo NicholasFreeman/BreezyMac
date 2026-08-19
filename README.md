@@ -9,7 +9,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/platform-macOS%2026-blue" alt="Platform: macOS 26">
   <img src="https://img.shields.io/badge/chip-Apple%20Silicon-black" alt="Apple Silicon">
-  <img src="https://img.shields.io/badge/status-alpha-orange" alt="Status: alpha">
+  <img src="https://img.shields.io/badge/status-beta-orange" alt="Status: beta">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT">
 </p>
 
