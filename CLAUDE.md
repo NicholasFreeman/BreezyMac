@@ -38,6 +38,21 @@ use-case is served by battery-specific setpoints/curves. Automatic and Adaptive
 depend on live temps (`OperatingMode.needsTemperature`), so a tick reads them
 even when no UI is visible.
 
+**Cool-idle 0-RPM handoff (Automatic + Adaptive).** A forced manual fan target
+is firmware-clamped to each fan's minimum (`F{i}Mn`), so BreezyMac cannot itself
+command 0 RPM. Instead, when the control fraction sits at/near zero (≤ 0.02) for
+`handoffSettleSeconds` (10 s), `FanController` hands *all* fans back to macOS via
+`releaseControl()` — which clears `Ftst`, letting macOS's own controller spin
+them fully down, to 0. Control is re-taken immediately (no dwell) once the
+fraction rises past the re-engage band (≥ 0.08), so a load spike is answered
+within one tick; the 0.02↔0.08 gap is the anti-chatter hysteresis. For Automatic
+the handoff boundary ≈ the `target` setpoint (below target the proportional term
+is already 0); for Adaptive it sits just under each curve's first non-zero knee,
+so a curve point of `0%` finally means *off*, not minimum. Because macOS governs
+while spun-down, the post-load fan tail follows macOS's fuller thermal model
+(chassis/heatsink mass), not our die-only sensors — it can hold minimum airflow
+for minutes after die temps drop, then stop. This is intended, not a stall.
+
 ## Safety invariants (non-negotiable — these are product requirements)
 
 1. **No influence when the UI isn't active.** The app sends a heartbeat every
@@ -176,7 +191,9 @@ ship from them.
   the target at 26.0 for now; don't spend effort on back-compat yet.
 - **Silent mode removed** (second round). Its battery/quiet use-case is now
   served by power-source-aware setpoints (Automatic) and battery-specific curves
-  (Adaptive). True 0-RPM feasibility on M-series is a later exploration.
+  (Adaptive). True 0-RPM in Automatic/Adaptive is now delivered by the cool-idle
+  macOS handoff (above): a forced manual target can't go below `F{i}Mn`, so the
+  app returns control to macOS when cool and lets it stop the fans completely.
 - **Status-bar icon:** the current colored 18pt image is fine. Aesthetics and
   animation come after the app is functional.
 - **Portuguese: pt-BR** (Brazilian) is the supported dialect.
@@ -185,11 +202,12 @@ ship from them.
 
 Confirmed working on-device (macOS 26): helper install/approval (needs an app
 restart after enabling in Login Items), Performance mode, Disabled↔Performance
-switching, lid-close release + wake resume, and live fan-speed reads.
+switching, lid-close release + wake resume, live fan-speed reads, and the
+cool-idle 0-RPM handoff in Automatic/Adaptive (fans hand back to macOS below
+threshold and spin fully down; ~10 s settle on entry; re-engage on load).
 
 ## Still open / next up
 
 - Adaptive-mode curve editor UX and the CPU/GPU-usage inputs to the algorithm.
-- Silent 0-RPM investigation (deferred).
 - Release signing/notarization + Swift 6 language mode (deferred).
 ```

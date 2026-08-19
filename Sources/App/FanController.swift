@@ -34,6 +34,15 @@ final class FanController {
     private var installRequested = false
     private var lastAppliedTargets: [Int] = []
 
+    /// Cool-idle handoff state (Automatic/Adaptive). When the control law wants
+    /// (near-)zero airflow we hand every fan back to macOS auto — which, unlike a
+    /// forced manual target clamped to `F{i}Mn`, can spin the fans all the way to
+    /// 0 RPM — and re-take manual control the instant airflow is wanted again.
+    private var coolingHandoffActive = false
+    /// When the fraction first dropped to the handoff-enter threshold; the fans
+    /// only spin down once it has stayed there for `handoffSettleSeconds`.
+    private var releaseCandidateSince: Date?
+
     // Visibility of any UI that needs live telemetry.
     private var popoverVisible = false
     private var windowVisible = false
@@ -48,6 +57,15 @@ final class FanController {
     /// Adaptive re-apply deadband: ignore sub-threshold target drift so a slowly
     /// varying temperature doesn't cause a continuous stream of SMC writes.
     private let reapplyDeadbandRPM = 50
+
+    /// Cool-idle handoff thresholds, as a fraction of a fan's [min, max] range.
+    /// At/below `handoffEnterFraction` — sustained for `handoffSettleSeconds` — we
+    /// return every fan to macOS so it can stop them completely; at/above
+    /// `handoffExitFraction` we re-take manual control immediately (no dwell, so a
+    /// load spike is answered within one tick). The gap is the anti-chatter band.
+    private let handoffEnterFraction = 0.02
+    private let handoffExitFraction  = 0.08
+    private let handoffSettleSeconds: TimeInterval = 10
 
     /// The timer must run while we're either controlling fans (heartbeat needed)
     /// or showing live data. Otherwise it stops and the app idles.
@@ -217,29 +235,82 @@ final class FanController {
     private func drive() {
         switch state.mode {
         case .disabled:
+            resetCoolingHandoff()
             if engaged {
                 helper.releaseControl()
                 engaged = false
                 lastAppliedTargets = []
             }
-        case .automatic, .adaptive, .performance:
-            // Lazily register the privileged helper the first time control is
-            // actually needed. install() is a no-op once ready.
-            if !isHelperReady, !installRequested {
-                installRequested = true
-                helper.install()
-            }
-            guard isHelperReady else { return }   // waiting on install / user approval
 
-            let targets = targets(for: state.mode)
-            guard !targets.isEmpty else { return }   // fan bounds not resolved yet
-            if shouldReapply(targets) {
-                helper.applyFanTargets(targets)
-                lastAppliedTargets = targets
-            }
-            helper.heartbeat()   // keep the watchdog satisfied every tick
+        case .performance:
+            resetCoolingHandoff()          // Performance is always max — never idles
+            guard ensureHelperReady() else { return }
+            applyTargets(performanceTargets())
+            helper.heartbeat()
             engaged = true
+
+        case .automatic, .adaptive:
+            guard ensureHelperReady() else { return }
+            driveFractionMode(controlFraction())
+            helper.heartbeat()             // keep the watchdog satisfied every tick
         }
+    }
+
+    /// Lazily register the privileged helper the first time control is actually
+    /// needed (`install()` is a no-op once ready); true once it can take writes.
+    private func ensureHelperReady() -> Bool {
+        if !isHelperReady, !installRequested {
+            installRequested = true
+            helper.install()
+        }
+        return isHelperReady   // false → still waiting on install / user approval
+    }
+
+    /// Automatic/Adaptive control with cool-idle handoff. `frac` is the fan-speed
+    /// fraction the active control law wants this tick.
+    private func driveFractionMode(_ frac: Double) {
+        if coolingHandoffActive {
+            // Fans are on macOS auto (possibly fully stopped). Grab control back
+            // the moment the law wants meaningful airflow — no dwell, so a spike
+            // is answered on the next tick.
+            guard frac >= handoffExitFraction else { return }
+            coolingHandoffActive = false
+            releaseCandidateSince = nil
+        } else if frac <= handoffEnterFraction {
+            // Cool enough to hand back — but only once it has stayed cool, so a
+            // brief dip doesn't blip the fans off and straight back on.
+            let now = Date()
+            let since = releaseCandidateSince ?? now
+            releaseCandidateSince = since
+            if now.timeIntervalSince(since) >= handoffSettleSeconds {
+                helper.releaseControl()    // returns all fans to macOS + clears Ftst
+                coolingHandoffActive = true
+                releaseCandidateSince = nil
+                lastAppliedTargets = []     // force a fresh apply when we re-engage
+                engaged = false
+                return
+            }
+            // Settle window not elapsed yet: keep holding at (near-min) below.
+        } else {
+            releaseCandidateSince = nil     // fraction climbed back out of the band
+        }
+
+        applyTargets(fractionTargets(frac))
+        engaged = true
+    }
+
+    /// Apply a target set through the re-apply deadband, recording what we sent.
+    private func applyTargets(_ targets: [Int]) {
+        guard !targets.isEmpty else { return }   // fan bounds not resolved yet
+        if shouldReapply(targets) {
+            helper.applyFanTargets(targets)
+            lastAppliedTargets = targets
+        }
+    }
+
+    private func resetCoolingHandoff() {
+        coolingHandoffActive = false
+        releaseCandidateSince = nil
     }
 
     /// (Re)apply the current mode immediately, e.g. on mode change, helper-ready,
@@ -252,26 +323,32 @@ final class FanController {
 
     // MARK: Target computation
 
-    private func targets(for mode: OperatingMode) -> [Int] {
-        let bounds = reader.fanBounds()
-        guard !bounds.isEmpty else { return [] }
-        switch mode {
-        case .disabled:
-            return bounds.map { _ in kFanTargetAuto }
-        case .performance:
-            return bounds.map { $0.maxRPM }
+    /// The fan-speed fraction (0...1) the active fraction-driven mode wants now.
+    /// Called exactly once per tick — `automatic.fraction` advances the dT/dt and
+    /// smoothing state, so it must not be evaluated twice for the same instant.
+    private func controlFraction() -> Double {
+        switch state.mode {
         case .automatic:
-            let frac = automatic.fraction(cpu: state.telemetry.cpuTemp,
-                                          gpu: state.telemetry.gpuTemp,
-                                          thermalState: state.thermalState,
-                                          source: state.powerSource,
-                                          config: state.automaticConfig,
-                                          now: Date())
-            return bounds.map { fraction(frac, of: $0) }
+            return automatic.fraction(cpu: state.telemetry.cpuTemp,
+                                      gpu: state.telemetry.gpuTemp,
+                                      thermalState: state.thermalState,
+                                      source: state.powerSource,
+                                      config: state.automaticConfig,
+                                      now: Date())
         case .adaptive:
-            let frac = state.curveConfig.targetFraction(for: state.telemetry, source: state.powerSource)
-            return bounds.map { fraction(frac, of: $0) }
+            return state.curveConfig.targetFraction(for: state.telemetry, source: state.powerSource)
+        default:
+            return 0
         }
+    }
+
+    /// Per-fan RPM targets for a control fraction, and for Performance (all max).
+    private func fractionTargets(_ frac: Double) -> [Int] {
+        reader.fanBounds().map { fraction(frac, of: $0) }
+    }
+
+    private func performanceTargets() -> [Int] {
+        reader.fanBounds().map { $0.maxRPM }
     }
 
     /// Map a 0...1 fan fraction to an RPM within a fan's [min, max].
