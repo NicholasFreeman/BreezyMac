@@ -13,9 +13,9 @@
     <key>CFBundleName</key>
     <string>BreezyMac Helper</string>
     <key>CFBundleVersion</key>
-    <string>0.6.0</string>
+    <string>0.6.2</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.6.0</string>
+    <string>0.6.2</string>
     <key>SMAuthorizedClients</key>
     <array>
         <!-- TODO: append the Developer ID certificate clause for release builds. -->
