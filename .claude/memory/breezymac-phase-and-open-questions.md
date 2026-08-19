@@ -6,9 +6,21 @@ metadata:
 ---
 
 BreezyMac (macOS fan-control app, `org.WhoCo.BreezyMac`) — on branch `main`,
-builds clean via `make build`, tested on-device (macOS 26). `CLAUDE.md` is the
-authoritative architecture/safety doc; [[breezymac-user-preferences]] and
+builds clean via `make build`, tested on-device (macOS 26). Currently **v0.6.2**
+(bump workflow in [[breezymac-versioning]]). `CLAUDE.md` is the authoritative
+architecture/safety doc; [[breezymac-user-preferences]] and
 [[breezymac-reference-projects]] hold user tastes and reference lessons.
+
+**Localization (v0.6.2):** all UI strings now translated across the 8 shipped
+locales (en, en-GB, es, zh-Hans, ko, de, fr, pt-BR) in
+`Sources/App/Resources/Localizable.xcstrings` — previously only ~7 of ~79
+`String(localized:)` keys had non-English values, so most UI silently fell back
+to English. Validate coverage with `xcrun xcstringstool compile` (all 8 `.lproj`,
+79 keys each). The status-bar **popover now auto-sizes to content** with a
+`.frame(minWidth: 340)` floor + `.fixedSize()` (was hard `width: 340`), so the
+segmented mode picker's longer labels (e.g. Portuguese) aren't clipped;
+`NSHostingController.sizingOptions = [.preferredContentSize]` already lets the
+popover track the intrinsic size. All verified on-device across every locale.
 
 ## Current mode model (Silent removed)
 

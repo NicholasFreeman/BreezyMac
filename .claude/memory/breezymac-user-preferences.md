@@ -27,6 +27,10 @@ their workloads. Goal is simply "fans at whatever level avoids throttling."
 **Working style:** tests thoroughly on real hardware and gives precise,
 step-by-step feedback (very valuable — trust it). Likes committing progress and
 keeping memory current; comfortable starting fresh sessions when context fills.
+**Commits directly on `main`** (solo repo, linear history) — when he asks to
+commit, commit on the current branch; don't push for feature branches/PRs.
+Memories live in the project-local **`.claude/memory/`** (git-tracked), not any
+global path. See [[breezymac-versioning]] for the release/version-bump workflow.
 
 **Git / project identity:** commit author is **Nicholas Freeman** with GitHub's
 protected no-reply address `12092720+NicholasFreeman@users.noreply.github.com`.
