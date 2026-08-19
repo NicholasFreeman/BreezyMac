@@ -51,12 +51,17 @@ struct PopoverView: View {
             footer
         }
         .padding(14)
-        .frame(width: 340)
-        // Hug the content vertically so NSHostingController reports the popover's
-        // true height. Without this the view expands to the proposed height, the
-        // popover over-sizes, and it either flips off the top of the screen (tall)
-        // or floats below the icon with a gap (short).
-        .fixedSize(horizontal: false, vertical: true)
+        // 340pt is the *minimum* width; the view grows past it to fit its content
+        // (the segmented mode picker is the widest row, and its labels are longer
+        // in some locales — e.g. Portuguese — than in English).
+        .frame(minWidth: 340)
+        // Hug the content in BOTH axes so NSHostingController reports the popover's
+        // true size (its `.preferredContentSize` drives the popover). Without this
+        // the view expands to the proposed size: horizontally the long labels get
+        // clamped/truncated, and vertically it over-sizes and flips off the top of
+        // the screen (tall) or floats below the icon with a gap (short). The
+        // `minWidth` above is the floor; `.fixedSize` measures the ideal above it.
+        .fixedSize()
     }
 
     // MARK: Header
