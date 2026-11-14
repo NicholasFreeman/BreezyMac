@@ -51,17 +51,20 @@ struct PopoverView: View {
             footer
         }
         .padding(14)
-        // 340pt is the *minimum* width; the view grows past it to fit its content
-        // (the segmented mode picker is the widest row, and its labels are longer
-        // in some locales — e.g. Portuguese — than in English).
-        .frame(minWidth: 340)
-        // Hug the content in BOTH axes so NSHostingController reports the popover's
-        // true size (its `.preferredContentSize` drives the popover). Without this
-        // the view expands to the proposed size: horizontally the long labels get
-        // clamped/truncated, and vertically it over-sizes and flips off the top of
-        // the screen (tall) or floats below the icon with a gap (short). The
-        // `minWidth` above is the floor; `.fixedSize` measures the ideal above it.
-        .fixedSize()
+        // Fixed width, height-only fit. Do NOT restore a both-axis `.fixedSize()`
+        // here (it was the cause of a severe CPU/energy regression): with the
+        // hosting controller's `.preferredContentSize` sizing and an animated
+        // popover, auto-measuring the WIDTH never converges. SwiftUI measures an
+        // ideal width → sets `preferredContentSize` → the popover animates its
+        // frame to it → the `.segmented` mode Picker reports a *different* ideal
+        // width for the new proposal → `preferredContentSize` changes again →
+        // animate → repeat, every display frame (~60–120 Hz). That pinned a core
+        // continuously (the slow popover open + the "idle" energy drain). Pinning
+        // the width removes the oscillating axis; the height still hugs the content
+        // (`.fixedSize(vertical:)`), so the popover is neither off-screen nor
+        // gapped. 360pt fits the widest localized mode row (pt-BR/de/fr).
+        .frame(width: 360)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     // MARK: Header

@@ -68,7 +68,11 @@ final class StatusBarController: NSObject, NSPopoverDelegate {
         hosting.sizingOptions = [.preferredContentSize]   // popover tracks content size
         popover.contentViewController = hosting
         popover.behavior = .transient      // closes when the user clicks away
-        popover.animates = true
+        // No resize animation. The content is a fixed-width, height-hugging SwiftUI
+        // tree (see PopoverView): animating every `preferredContentSize` change is
+        // what turned a one-shot settle into a per-frame layout loop. Keeping it off
+        // is belt-and-suspenders against any residual self-sizing churn.
+        popover.animates = false
         popover.delegate = self
     }
 
