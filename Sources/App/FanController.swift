@@ -29,6 +29,7 @@ final class FanController {
     private let powerMonitor = PowerSourceMonitor()
 
     private var timer: Timer?
+    private var thermalObserver: NSObjectProtocol?
     private var asleep = false
     private var engaged = false
     private var installRequested = false
@@ -106,9 +107,16 @@ final class FanController {
         nc.addObserver(self, selector: #selector(willSleep), name: NSWorkspace.willSleepNotification, object: nil)
         nc.addObserver(self, selector: #selector(didWake), name: NSWorkspace.didWakeNotification, object: nil)
         // Thermal pressure is our throttle proxy — react immediately, not on the
-        // next 2 s tick, when macOS reports it changed.
-        NotificationCenter.default.addObserver(self, selector: #selector(thermalChanged),
-                                               name: ProcessInfo.thermalStateDidChangeNotification, object: nil)
+        // next 2 s tick, when macOS reports it changed. Delivered explicitly on
+        // the main queue: ProcessInfo posts this notification from a background
+        // GCD queue, and mutating @Published AppState / driving SwiftUI off the
+        // main thread deadlocks the main run loop on the ObservableObject lock.
+        thermalObserver = NotificationCenter.default.addObserver(
+            forName: ProcessInfo.thermalStateDidChangeNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.thermalChanged() }
+        }
 
         // Track power source and re-apply when it changes (setpoints/curves differ).
         state.thermalState = ProcessInfo.processInfo.thermalState
@@ -380,7 +388,7 @@ final class FanController {
         applyCurrentMode()
     }
 
-    @objc private func thermalChanged() {
+    private func thermalChanged() {
         state.thermalState = ProcessInfo.processInfo.thermalState
         // In Automatic, thermal pressure jumps the fans to max — apply now
         // rather than waiting for the next tick.
