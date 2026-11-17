@@ -468,6 +468,6 @@ private struct AboutTab: View {
     }
 
     private var appVersion: String {
-        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "0.6.3"
+        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "0.6.4"
     }
 }
